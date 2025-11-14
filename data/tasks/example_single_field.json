@@ -1,0 +1,8 @@
+{
+  "url": "https://httpbin.org/forms/post",
+  "field_selector": "input[name='custname']",
+  "submit_selector": "input[type='submit']",
+  "success_condition": "httpbin",
+  "max_steps": 50
+}
+

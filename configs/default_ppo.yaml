@@ -1,0 +1,11 @@
+# PPO configuration
+learning_rate: 3e-4
+gamma: 0.99
+gae_lambda: 0.95
+clip_epsilon: 0.2
+num_epochs: 4
+batch_size: 64
+buffer_size: 2048
+num_episodes: 1000
+task_path: data/tasks/
+

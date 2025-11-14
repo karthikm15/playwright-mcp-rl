@@ -1,0 +1,104 @@
+{
+  "task": {
+    "url": "https://example.com/form",
+    "field_selector": "#email-input",
+    "submit_selector": "#submit-btn",
+    "success_condition": "Thank you",
+    "max_steps": 50
+  },
+  "observations": [
+    {
+      "type": "snapshot",
+      "url": "https://example.com/form",
+      "elements": [
+        {
+          "ref": "e1",
+          "type": "textbox",
+          "name": "Input",
+          "value": "user@example.com"
+        },
+        {
+          "ref": "e2",
+          "type": "button",
+          "name": "Submit"
+        }
+      ]
+    },
+    {
+      "type": "snapshot",
+      "url": "https://example.com/form",
+      "elements": [
+        {
+          "ref": "e1",
+          "type": "textbox",
+          "name": "Input",
+          "value": "user@example.com"
+        },
+        {
+          "ref": "e2",
+          "type": "button",
+          "name": "Submit"
+        }
+      ]
+    },
+    {
+      "type": "snapshot",
+      "url": "https://example.com/form",
+      "elements": [
+        {
+          "ref": "e1",
+          "type": "textbox",
+          "name": "Input",
+          "value": "user@example.com"
+        },
+        {
+          "ref": "e2",
+          "type": "button",
+          "name": "Submit"
+        }
+      ]
+    },
+    {
+      "type": "snapshot",
+      "url": "https://example.com/form/success",
+      "elements": [
+        {
+          "ref": "e3",
+          "type": "heading",
+          "name": "Thank you",
+          "value": "Thank you for submitting!"
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "type": "click",
+      "element_ref": "e1",
+      "description": "Email input field",
+      "text": ""
+    },
+    {
+      "type": "type",
+      "element_ref": "e1",
+      "description": "Email input field",
+      "text": "user@example.com"
+    },
+    {
+      "type": "submit",
+      "element_ref": "e2",
+      "description": "Submit button",
+      "text": ""
+    }
+  ],
+  "rewards": [
+    0.0,
+    0.0,
+    1.0
+  ],
+  "dones": [
+    false,
+    false,
+    true
+  ]
+}
