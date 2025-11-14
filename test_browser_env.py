@@ -58,7 +58,8 @@ async def main():
                     print(f"Found input field: {input_ref} in line: {line.strip()}")
             
             # Look for submit button
-            if ('submit' in line_lower or ('button' in line_lower and 'type' in line_lower)) and '[ref=' in line:
+            # Only capture lines where 'submit' appears as text in the line (not just in type or attribute)
+            if re.search(r'>\s*submit\s*<', line, re.IGNORECASE) and '[ref=' in line:
                 ref_match = re.search(r'\[ref=([^\]]+)\]', line)
                 if ref_match:
                     submit_ref = ref_match.group(1)

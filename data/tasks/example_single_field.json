@@ -1,8 +1,8 @@
 {
-  "url": "https://httpbin.org/forms/post",
+  "url": "https://forms.gle/3wDrj8cg2rFwPjWf6",
   "field_selector": "input[name='custname']",
   "submit_selector": "input[type='submit']",
-  "success_condition": "httpbin",
+  "success_condition": "response has been recorded",
   "max_steps": 50
 }
 

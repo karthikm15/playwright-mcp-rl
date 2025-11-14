@@ -94,8 +94,15 @@ class BrowserEnv:
         self.current_step = 0
         url = self.task_config['url']
         await self._navigate(url)
+        # Wait and try to get a non-empty state dict; retry if empty.
         await self._wait_for(time=1.0)
+        tries = 0
         state = await self._get_snapshot()
+        while (not state or not isinstance(state, dict) or not state) and tries < 10:
+            print(f"line 102: State: {state}")
+            await self._wait_for(time=0.5)
+            state = await self._get_snapshot()
+            tries += 1
         return state
     
     async def step(self, action: Dict[str, Any]) -> Tuple[Dict[str, Any], float, bool, Dict[str, Any]]:
