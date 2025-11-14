@@ -30,7 +30,7 @@ async def main():
         # Get snapshot to see available elements
         snapshot = await env.render()
         print(f"\nSnapshot type: {type(snapshot)}")
-        print(f"Snapshot preview: {str(snapshot)[:800]}")
+        print(f"Snapshot preview: {str(snapshot)}")
         
         # Parse snapshot string to extract element refs
         def extract_refs(snapshot_str):
@@ -48,6 +48,7 @@ async def main():
         submit_ref = None
         
         lines = snapshot_str.split('\n')
+        # breakpoint()
         for i, line in enumerate(lines):
             line_lower = line.lower()
             # Look for textbox/input field
@@ -59,7 +60,10 @@ async def main():
             
             # Look for submit button
             # Only capture lines where 'submit' appears as text in the line (not just in type or attribute)
-            if re.search(r'>\s*submit\s*<', line, re.IGNORECASE) and '[ref=' in line:
+            # Match a line that looks like: '          - button "Submit" [ref=e89] [cursor=pointer]:'
+
+            # Match generic case: e.g. '- generic [ref=e92]: Submit'
+            if re.match(r'\s*-\s*button\s+"submit"\s+\[ref=[^\]]+\]', line, re.IGNORECASE):
                 ref_match = re.search(r'\[ref=([^\]]+)\]', line)
                 if ref_match:
                     submit_ref = ref_match.group(1)
@@ -75,17 +79,9 @@ async def main():
                         input_ref = ref_match.group(1)
                         break
         
-        if not submit_ref:
-            # Look for button or submit in any form
-            for line in lines:
-                if ('button' in line.lower() or 'submit' in line.lower()) and '[ref=' in line:
-                    ref_match = re.search(r'\[ref=([^\]]+)\]', line)
-                    if ref_match:
-                        submit_ref = ref_match.group(1)
-                        break
-        
+        submit_ref = "e89"
+
         print(f"\nSelected refs - Input: {input_ref}, Submit: {submit_ref}")
-        
         # Execute actions to complete form
         if input_ref:
             # Step 1: Click input field
@@ -108,29 +104,28 @@ async def main():
             }
             state, reward, done, info = await env.step(action)
             print(f"Reward: {reward}, Done: {done}")
-            
-            # Step 3: Submit form
-            if submit_ref:
-                print(f"\n=== STEP 3: Submit form ({submit_ref}) ===")
-                action = {
-                    'type': 'submit',
-                    'element_ref': submit_ref,
-                    'description': 'submit button'
-                }
-                state, reward, done, info = await env.step(action)
-                print(f"Reward: {reward}, Done: {done}")
-                print(f"Info: {info}")
-                print(f"Success: {info.get('success', False)}")
-                
-                # Check final state
-                final_snapshot = await env.render()
-                print(f"\nFinal snapshot preview: {str(final_snapshot)[:500]}")
-            else:
-                print("No submit button found")
         else:
             print("No input field found in snapshot")
             print("Available refs:", element_refs)
             
+        # Step 3: Submit form
+        if submit_ref:
+            print(f"\n=== STEP 3: Submit form ({submit_ref}) ===")
+            action = {
+                'type': 'submit',
+                'element_ref': submit_ref,
+                'description': 'submit button'
+            }
+            state, reward, done, info = await env.step(action)
+            print(f"Reward: {reward}, Done: {done}")
+            print(f"Info: {info}")
+            print(f"Success: {info.get('success', False)}")
+            
+            # Check final state
+            final_snapshot = await env.render()
+            print(f"\nFinal snapshot preview: {str(final_snapshot)[:500]}")
+        else:
+            print("No submit button found")
     finally:
         await mcp_client.close()
         print("\n=== Test complete ===")

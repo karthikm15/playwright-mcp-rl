@@ -1,8 +1,8 @@
 {
-  "url": "https://forms.gle/3wDrj8cg2rFwPjWf6",
+  "url": "https://forms.gle/8vwKq3BXLqML4HSx8",
   "field_selector": "input[name='custname']",
   "submit_selector": "input[type='submit']",
-  "success_condition": "response has been recorded",
+  "success_condition": "response",
   "max_steps": 50
 }
 

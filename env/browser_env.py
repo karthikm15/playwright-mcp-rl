@@ -32,10 +32,14 @@ class BrowserEnv:
         if not self.mcp_client:
             return None
         try:
+            print(f"Calling MCP tool {tool_name} with params: {params}")
             result = await self.mcp_client.call_tool(tool_name, params)
+            print(f"MCP tool {tool_name} returned: {result}")
             return result
         except Exception as e:
             print(f"Error calling MCP tool {tool_name}: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     async def _navigate(self, url: str):
@@ -54,8 +58,8 @@ class BrowserEnv:
     
     async def _click(self, element_ref: str, description: str = ""):
         """Click element using MCP browser_click."""
+        # Playwright MCP browser_click typically only needs the ref
         return await self._call_mcp_tool('browser_click', {
-            'element': description,
             'ref': element_ref
         })
     
@@ -95,14 +99,20 @@ class BrowserEnv:
         url = self.task_config['url']
         await self._navigate(url)
         # Wait and try to get a non-empty state dict; retry if empty.
-        await self._wait_for(time=1.0)
-        tries = 0
+        # Use exponential backoff for waiting, up to a max wait of 60 seconds total
+        backoff = 0.5
+        max_wait = 60.0
+
+        await self._wait_for(time=backoff)
+
         state = await self._get_snapshot()
-        while (not state or not isinstance(state, dict) or not state) and tries < 10:
+        while (not state or not isinstance(state, dict) or not state) and backoff < max_wait:
             print(f"line 102: State: {state}")
-            await self._wait_for(time=0.5)
+            backoff = min(backoff * 2, max_wait)
+            if backoff <= 0:
+                break
+            await self._wait_for(time=backoff)
             state = await self._get_snapshot()
-            tries += 1
         return state
     
     async def step(self, action: Dict[str, Any]) -> Tuple[Dict[str, Any], float, bool, Dict[str, Any]]:
