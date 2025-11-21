@@ -2,7 +2,7 @@
   "url": "https://forms.gle/8vwKq3BXLqML4HSx8",
   "field_selector": "input[name='custname']",
   "submit_selector": "input[type='submit']",
-  "success_condition": "response",
+  "success_condition": "Your response has been recorded.",
   "max_steps": 50
 }
 

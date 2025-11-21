@@ -1,125 +1,84 @@
-"""MCP client using urllib requests."""
+"""Playwright browser client using Playwright Python library."""
 
-import json
-import asyncio
-from urllib.request import Request, urlopen
-from urllib.error import HTTPError
 from typing import Dict, Any, Optional
+
+from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 
 
 class MCPClient:
-    """MCP client wrapper for Playwright browser tools."""
+    """Playwright browser client wrapper (maintains MCPClient interface for compatibility)."""
     
-    def __init__(self, url: str, session_id: Optional[str] = None):
-        self.url = url
-        self.session_id = session_id
+    def __init__(self, browser: Optional[Browser] = None, context: Optional[BrowserContext] = None, page: Optional[Page] = None):
+        self.browser = browser
+        self.context = context
+        self.page = page
+        self.playwright = None
         self.initialized = False
     
     @classmethod
-    async def create(cls, url: str = "http://localhost:8931/mcp"):
-        """Create MCP client connected to Playwright server."""
-        client = cls(url)
-        await client.initialize()
+    async def create(cls, url: str = None):
+        """Create Playwright browser client."""
+        playwright = await async_playwright().start()
+        browser = await playwright.chromium.launch(headless=True)
+        context = await browser.new_context()
+        page = await context.new_page()
+        
+        client = cls(browser, context, page)
+        client.playwright = playwright
+        client.initialized = True
         return client
     
-    async def _post_json(self, payload: Dict[str, Any]) -> tuple:
-        """Post JSON-RPC request and parse SSE response."""
-        data = json.dumps(payload).encode("utf-8")
-        headers = {
-            "Content-Type": "application/json",
-            "Accept": "application/json, text/event-stream",
-        }
-        if self.session_id:
-            headers["Mcp-Session-Id"] = self.session_id
-        
-        req = Request(self.url, data=data, headers=headers, method="POST")
-        
-        try:
-            resp = urlopen(req)
-            body = resp.read().decode("utf-8")
-            status = resp.status
-            resp_headers = dict(resp.headers)
-        except HTTPError as e:
-            body = e.read().decode("utf-8")
-            status = e.code
-            resp_headers = dict(e.headers)
-        
-        # Parse SSE response
-        msg = None
-        for line in body.splitlines():
-            line = line.strip()
-            if line.startswith("data:"):
-                data_str = line[len("data:"):].strip()
-                if data_str:
-                    try:
-                        msg = json.loads(data_str)
-                    except json.JSONDecodeError:
-                        pass
-                    break
-        
-        # Extract session ID
-        if not self.session_id:
-            self.session_id = (
-                resp_headers.get("mcp-session-id")
-                or resp_headers.get("Mcp-Session-Id")
-                or resp_headers.get("MCP-SESSION-ID")
-            )
-        
-        return status, msg
-    
     async def initialize(self):
-        """Initialize MCP session."""
-        payload = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {},
-                "clientInfo": {"name": "playwright-rl", "version": "0.1.0"},
-            },
-        }
-        status, result = await self._post_json(payload)
-        if status != 200:
-            raise Exception(f"Initialize failed: {status}")
-        
-        # Send initialized notification
-        await self._post_json({
-            "jsonrpc": "2.0",
-            "method": "initialized",
-            "params": {},
-        })
+        """Initialize browser (already done in create, but kept for compatibility)."""
+        if not self.initialized:
+            await self.create()
         self.initialized = True
     
     async def call_tool(self, tool_name: str, params: Dict[str, Any]) -> Any:
-        """Call MCP tool."""
-        if not self.initialized:
+        """Call browser tool (maps MCP tool names to Playwright methods)."""
+        if not self.initialized or not self.page:
             await self.initialize()
         
-        payload = {
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "tools/call",
-            "params": {"name": tool_name, "arguments": params},
-        }
-        status, result = await self._post_json(payload)
-        if status != 200 or not result:
-            return None
+        if tool_name == 'browser_navigate':
+            url = params.get('url')
+            if url:
+                await self.page.goto(url, wait_until='domcontentloaded')
+                return {'url': url}
         
-        # Extract result content
-        if "result" in result:
-            result_data = result["result"]
-            if "content" in result_data:
-                content = result_data["content"]
-                if content and len(content) > 0:
-                    text = content[0].get("text", "")
-                    try:
-                        return json.loads(text)
-                    except:
-                        return text
-            return result_data
+        elif tool_name == 'browser_snapshot':
+            # Get accessibility snapshot
+            snapshot = await self.page.accessibility.snapshot()
+            return snapshot
+        
+        elif tool_name == 'browser_click':
+            ref = params.get('ref')
+            if ref:
+                # Find element by ref and click
+                # We'll need to maintain a ref-to-locator mapping
+                # For now, this is a placeholder - will be handled in BrowserEnv
+                return {'clicked': ref}
+        
+        elif tool_name == 'browser_type':
+            ref = params.get('ref')
+            text = params.get('text', '')
+            if ref and text:
+                # Find element by ref and type
+                # Will be handled in BrowserEnv
+                return {'typed': ref, 'text': text}
+        
+        elif tool_name == 'browser_wait_for':
+            if 'time' in params:
+                import asyncio
+                await asyncio.sleep(params['time'])
+            elif 'text' in params:
+                await self.page.wait_for_selector(f"text={params['text']}", timeout=5000)
+            return {'waited': True}
+        
         return None
     
     async def close(self):
-        """Close client."""
-        pass
+        """Close browser and cleanup."""
+        if self.browser:
+            await self.browser.close()
+        if self.playwright:
+            await self.playwright.stop()
