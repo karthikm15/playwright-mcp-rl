@@ -27,7 +27,7 @@
           "ref": "e8",
           "type": "textbox",
           "name": "What is your name? Required question",
-          "value": "jane"
+          "value": ""
         },
         {
           "ref": "e10",

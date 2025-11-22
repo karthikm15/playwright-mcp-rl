@@ -26,7 +26,7 @@
 ### Rewards
 - Success: +1.0 on task completion
 - Failure: -1.0 on timeout/error
-- Step penalty: -0.01 per step
+- Step penalty: -0.1 per step
 
 ### Task Definition
 - URL, field selectors, success condition (stored in `data/tasks/`)

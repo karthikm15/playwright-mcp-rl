@@ -347,7 +347,7 @@ class BrowserEnv:
         state = await self._get_snapshot()
         
         done = False
-        reward = -0.01
+        reward = -0.1
         success = await self._check_success()
         
         if success:
