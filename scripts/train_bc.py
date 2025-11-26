@@ -7,6 +7,8 @@ from typing import List, Dict, Any
 
 import torch
 
+from utils.transformer_state_encoder import TransformerStateEncoder
+
 sys.path.append(str(Path(__file__).parent.parent))
 
 from models.policy import MLPPolicy
@@ -43,25 +45,29 @@ def main():
     trajectories = load_trajectories([str(f) for f in existing_files])
     
     # Initialize encoders
-    state_encoder = StateEncoder(max_elements=50, element_dim=64)
+    max_elements = 50
+    state_encoder = TransformerStateEncoder(max_elements=max_elements, d_model=128)
     action_encoder = ActionEncoder()
-    
-    # Build action vocabulary first
-    action_encoder.build_vocab(trajectories)
     
     # Initialize policy
     state_dim = state_encoder.get_state_dim()
-    action_dim = action_encoder.get_action_dim()
+    num_action_types = action_encoder.get_num_action_types()
     
-    print(f"\nPolicy architecture:")
+    print("\nPolicy architecture:")
     print(f"  State dimension: {state_dim}")
-    print(f"  Action dimension: {action_dim}")
+    print(f"  Num action types: {num_action_types}")
+    print(f"  Max elements: {max_elements}")
     
-    policy = MLPPolicy(state_dim=state_dim, action_dim=action_dim, hidden_dims=[256, 128])
+    policy = MLPPolicy(
+        state_dim=state_dim,
+        num_action_types=num_action_types,
+        max_elements=max_elements,
+        hidden_dims=[256, 128],
+    )
     
     # Training config
     config = {
-        'learning_rate': 1e-3,
+        'learning_rate': 1e-2,
         'batch_size': 32,
         'num_epochs': 200
     }
@@ -73,16 +79,17 @@ def main():
     # Save model
     model_dir = Path('models/checkpoints')
     model_dir.mkdir(parents=True, exist_ok=True)
-    model_path = model_dir / 'bc_policy.pt'
+    model_path = model_dir / 'bc_policy_compositional.pt'
     torch.save({
         'policy_state_dict': policy.state_dict(),
         'state_encoder_state_dict': state_encoder.state_dict(),
         'action_encoder': {
-            'action_to_idx': action_encoder.action_to_idx,
-            'idx_to_action': action_encoder.idx_to_action
+            # Save action type list for readability / potential extension
+            'action_types': action_encoder.action_types,
         },
         'state_dim': state_dim,
-        'action_dim': action_dim
+        'num_action_types': num_action_types,
+        'max_elements': max_elements,
     }, model_path)
     
     print(f"\nModel saved to {model_path}")

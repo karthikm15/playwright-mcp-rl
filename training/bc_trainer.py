@@ -12,8 +12,8 @@ class TrajectoryDataset(Dataset):
     def __init__(self, state_encoder, action_encoder, trajectories):
         self.state_encoder = state_encoder
         self.action_encoder = action_encoder
-        self.states = []
-        self.actions = []
+        self.states: List[Dict[str, Any]] = []
+        self.actions: List[Dict[str, Any]] = []
         
         # Extract (state, action) pairs
         for traj in trajectories:
@@ -32,9 +32,26 @@ class TrajectoryDataset(Dataset):
         return len(self.states)
     
     def __getitem__(self, idx):
-        state = self.state_encoder.encode_snapshot(self.states[idx])
-        action_idx = self.action_encoder.encode(self.actions[idx])
-        return state, action_idx
+        """
+        Return encoded state and compositional action targets.
+        
+        - state_tensor: encoded state
+        - action_type_idx: index into fixed action type set
+        - element_index: index into current state's element list
+        """
+        raw_state = self.states[idx]
+        raw_action = self.actions[idx]
+        
+        # Encode state
+        state_tensor = self.state_encoder.encode_snapshot(raw_state)
+        
+        # Use raw snapshot elements for element indexing
+        elements = raw_state.get('elements', [])
+        action_type_idx, element_index = self.action_encoder.encode(
+            raw_action, elements
+        )
+        
+        return state_tensor, torch.tensor(action_type_idx, dtype=torch.long), torch.tensor(element_index, dtype=torch.long)
 
 
 class BCTrainer:
@@ -61,7 +78,9 @@ class BCTrainer:
             params,
             lr=config.get('learning_rate', 1e-3)
         )
-        self.criterion = nn.CrossEntropyLoss()
+        # Separate losses for action type and element index
+        self.action_type_criterion = nn.CrossEntropyLoss()
+        self.element_criterion = nn.CrossEntropyLoss()
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.policy.to(self.device)
         self.state_encoder.to(self.device)
@@ -77,7 +96,9 @@ class BCTrainer:
         # Don't rebuild it here to avoid index mismatches
         
         # Create dataset
-        dataset = TrajectoryDataset(self.state_encoder, self.action_encoder, trajectories)
+        dataset = TrajectoryDataset(
+            self.state_encoder, self.action_encoder, trajectories
+        )
         dataloader = DataLoader(
             dataset,
             batch_size=self.config.get('batch_size', 32),
@@ -92,13 +113,20 @@ class BCTrainer:
             total_loss = 0.0
             num_batches = 0
             
-            for states, action_indices in dataloader:
+            for states, action_type_targets, element_targets in dataloader:
                 states = states.to(self.device)
-                action_indices = action_indices.to(self.device)
+                action_type_targets = action_type_targets.to(self.device)
+                element_targets = element_targets.to(self.device)
                 
                 # Forward pass
-                logits = self.policy(states)
-                loss = self.criterion(logits, action_indices)
+                action_type_logits, element_logits = self.policy(states)
+                loss_type = self.action_type_criterion(
+                    action_type_logits, action_type_targets
+                )
+                loss_element = self.element_criterion(
+                    element_logits, element_targets
+                )
+                loss = loss_type + loss_element
                 
                 # Backward pass
                 self.optimizer.zero_grad()

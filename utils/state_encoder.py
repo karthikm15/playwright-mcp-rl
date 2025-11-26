@@ -2,7 +2,7 @@
 
 import torch
 import torch.nn as nn
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 
 class StateEncoder(nn.Module):
@@ -38,8 +38,11 @@ class StateEncoder(nn.Module):
         self.name_embedding = nn.Embedding(1000, 32)  # Hash name to 0-999
         self.value_embedding = nn.Embedding(1000, 16)  # Hash value to 0-999
         
+        # State features: filled/unfilled status (same as transformer encoder)
+        self.state_feature_dim = 3  # [is_filled, is_checked, has_value]
+        
         # Final element encoding dimension
-        self.element_encoding_dim = 16 + 32 + 16  # type + name + value
+        self.element_encoding_dim = 16 + 32 + 16 + self.state_feature_dim  # type + name + value + state_features
     
     def encode_element(self, element: Dict[str, Any]) -> torch.Tensor:
         """Encode a single element to vector."""
@@ -58,7 +61,27 @@ class StateEncoder(nn.Module):
         value_hash = hash(value) % 1000
         value_emb = self.value_embedding(torch.tensor(abs(value_hash), dtype=torch.long))
         
-        return torch.cat([type_emb, name_emb, value_emb])
+        # State features: capture filled/unfilled status
+        # This is critical for detecting small state changes
+        value_str = str(element.get('value', ''))
+        checked = element.get('checked', False)
+        
+        # is_filled: 1 if element has been filled (textbox with text, or checked radio/checkbox)
+        is_filled = 0.0
+        if elem_type == 'textbox' and value_str.strip():
+            is_filled = 1.0
+        elif elem_type in ['radio', 'checkbox'] and checked:
+            is_filled = 1.0
+        
+        # is_checked: 1 if radio/checkbox is checked
+        is_checked = 1.0 if (elem_type in ['radio', 'checkbox'] and checked) else 0.0
+        
+        # has_value: 1 if element has any value (for textboxes)
+        has_value = 1.0 if (elem_type == 'textbox' and value_str.strip()) else 0.0
+        
+        state_features = torch.tensor([is_filled, is_checked, has_value], dtype=torch.float32)
+        
+        return torch.cat([type_emb, name_emb, value_emb, state_features])
     
     def encode_snapshot(self, snapshot: Dict[str, Any]) -> torch.Tensor:
         """

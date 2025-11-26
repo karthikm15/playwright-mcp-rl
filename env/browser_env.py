@@ -61,6 +61,7 @@ class BrowserEnv:
             'name': node.get('name', ''),
             'value': node.get('value', ''),
             'description': node.get('description', ''),
+            'checked': node.get('checked', False),  # For radio/checkbox
         }
         self.ref_to_node[ref] = node_info
         
@@ -70,6 +71,7 @@ class BrowserEnv:
             'type': node.get('role', ''),
             'name': node.get('name', ''),
             'value': node.get('value', ''),
+            'checked': node.get('checked', False),  # For radio/checkbox
         }
         
         # Process children

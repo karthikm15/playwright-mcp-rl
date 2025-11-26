@@ -1,23 +1,43 @@
-"""Simple MLP policy for behavior cloning."""
+"""MLP policy for behavior cloning with compositional action space."""
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 class MLPPolicy(nn.Module):
-    """Simple MLP policy network."""
+    """
+    MLP policy network with compositional action space.
     
-    def __init__(self, state_dim: int, action_dim: int, hidden_dims: list = [256, 128]):
+    Instead of producing logits over a flat (type, element_ref) vocabulary,
+    this policy produces:
+      - action_type_logits: logits over a small fixed set of action types
+      - element_logits: logits over positions in the current element list
+    
+    Training code is responsible for providing appropriate targets:
+      - action_type_targets: [batch_size]
+      - element_index_targets: [batch_size]
+    """
+    
+    def __init__(
+        self,
+        state_dim: int,
+        num_action_types: int,
+        max_elements: int,
+        hidden_dims: list = [256, 128],
+    ):
         """
         Initialize MLP policy.
         
         Args:
             state_dim: Dimension of state encoding
-            action_dim: Number of possible actions
+            num_action_types: Number of discrete action types (e.g., click/type/check/submit/wait)
+            max_elements: Maximum number of elements considered in the state encoding
             hidden_dims: List of hidden layer dimensions
         """
         super().__init__()
+        
+        self.num_action_types = num_action_types
+        self.max_elements = max_elements
         
         layers = []
         prev_dim = state_dim
@@ -28,19 +48,26 @@ class MLPPolicy(nn.Module):
             prev_dim = hidden_dim
         
         self.encoder = nn.Sequential(*layers)
-        self.policy_head = nn.Linear(prev_dim, action_dim)
+        
+        # Separate heads for action type and element selection
+        self.action_type_head = nn.Linear(prev_dim, num_action_types)
+        # We produce logits for max_elements positions; any unused tail positions
+        # can be masked out by the caller if needed.
+        self.element_head = nn.Linear(prev_dim, max_elements)
     
-    def forward(self, state: torch.Tensor) -> torch.Tensor:
+    def forward(self, state: torch.Tensor):
         """
-        Forward pass: returns action logits.
+        Forward pass: returns compositional action logits.
         
         Args:
             state: State tensor [batch_size, state_dim]
         
         Returns:
-            logits: Action logits [batch_size, action_dim]
+            action_type_logits: [batch_size, num_action_types]
+            element_logits: [batch_size, max_elements]
         """
         features = self.encoder(state)
-        logits = self.policy_head(features)
-        return logits
+        action_type_logits = self.action_type_head(features)
+        element_logits = self.element_head(features)
+        return action_type_logits, element_logits
 

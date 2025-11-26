@@ -20,18 +20,36 @@ def load_model(model_path: str):
     checkpoint = torch.load(model_path, map_location='cpu')
     
     # Reconstruct encoders
-    state_encoder = StateEncoder(max_elements=50, element_dim=64)
+    # Use saved max_elements if available; fallback to 50
+    max_elements = checkpoint.get('max_elements', 50)
+    state_encoder = StateEncoder(max_elements=max_elements, element_dim=64)
     state_encoder.load_state_dict(checkpoint['state_encoder_state_dict'])
     state_encoder.eval()
     
     action_encoder = ActionEncoder()
-    action_encoder.action_to_idx = checkpoint['action_encoder']['action_to_idx']
-    action_encoder.idx_to_action = checkpoint['action_encoder']['idx_to_action']
+    # If custom action types were saved, use them (otherwise defaults are fine)
+    saved_action_types = checkpoint.get('action_encoder', {}).get('action_types')
+    if saved_action_types:
+        action_encoder.action_types = saved_action_types
+        action_encoder.type_to_idx = {
+            t: i for i, t in enumerate(saved_action_types)
+        }
+        action_encoder.idx_to_type = {
+            i: t for i, t in enumerate(saved_action_types)
+        }
     
     # Reconstruct policy
     state_dim = checkpoint['state_dim']
-    action_dim = checkpoint['action_dim']
-    policy = MLPPolicy(state_dim=state_dim, action_dim=action_dim, hidden_dims=[256, 128])
+    num_action_types = checkpoint.get(
+        'num_action_types', action_encoder.get_num_action_types()
+    )
+    max_elements = checkpoint.get('max_elements', max_elements)
+    policy = MLPPolicy(
+        state_dim=state_dim,
+        num_action_types=num_action_types,
+        max_elements=max_elements,
+        hidden_dims=[256, 128],
+    )
     policy.load_state_dict(checkpoint['policy_state_dict'])
     policy.eval()
     
@@ -39,8 +57,29 @@ def load_model(model_path: str):
 
 
 def extract_elements_from_snapshot(snapshot: Dict[str, Any]) -> list:
-    """Extract elements from snapshot for display."""
-    elements = snapshot.get('elements', [])
+    """
+    Extract interactive elements from a BrowserEnv snapshot.
+    
+    The live env returns a root node (e.g., WebArea) with its content
+    under 'children', not 'elements'. We treat every node that has a
+    'ref' as an element and flatten the tree.
+    """
+    elements = []
+    
+    def collect(node):
+        if not isinstance(node, dict):
+            return
+        # Any node with a 'ref' is considered an element
+        if 'ref' in node:
+            elements.append(node)
+        for value in node.values():
+            if isinstance(value, dict):
+                collect(value)
+            elif isinstance(value, list):
+                for child in value:
+                    collect(child)
+    
+    collect(snapshot)
     return elements
 
 
@@ -69,7 +108,8 @@ async def run_policy(task_config_path: str, model_path: str, headless: bool = Tr
     # Load model
     print(f"Loading model from {model_path}...")
     policy, state_encoder, action_encoder = load_model(model_path)
-    print(f"Model loaded: {action_encoder.get_action_dim()} actions")
+    print("Model loaded with compositional action space:")
+    print(f"  Action types: {action_encoder.action_types}")
     
     # Create environment
     env = BrowserEnv(task_config, headless=headless)
@@ -89,10 +129,11 @@ async def run_policy(task_config_path: str, model_path: str, headless: bool = Tr
         print("="*80)
         
         # Show available actions
-        print("\nAvailable actions in vocabulary:")
-        for i, (action_type, element_ref) in enumerate(action_encoder.idx_to_action):
-            print(f"  [{i}] {action_type} on {element_ref}")
+        print("\nAvailable action types:")
+        for i, t in enumerate(action_encoder.action_types):
+            print(f"  [{i}] {t}")
         print()
+        print("State:", state)
         
         while not done and step < task_config.get('max_steps', 50):
             # Show current state
@@ -106,21 +147,78 @@ async def run_policy(task_config_path: str, model_path: str, headless: bool = Tr
             
             # Get action from policy
             with torch.no_grad():
-                logits = policy(state_tensor)
-                probs = torch.softmax(logits, dim=1)
-                action_idx = torch.argmax(logits, dim=1).item()
-            
+                action_type_logits, element_logits = policy(state_tensor)
+                action_type_probs = torch.softmax(action_type_logits, dim=1)
+                
+                # First choose action type
+                action_type_idx = torch.argmax(action_type_logits, dim=1).item()
+                action_type = action_encoder.action_types[action_type_idx]
+                
+                # Build a mask over elements based on action type to ensure
+                # we only select semantically compatible refs.
+                valid_mask = []
+                for elem in elements:
+                    elem_type = str(elem.get('type', '')).lower()
+                    elem_name = str(elem.get('name', '')).lower()
+                    
+                    if action_type == 'type':
+                        # Only textboxes for typing
+                        is_valid = elem_type == 'textbox'
+                    elif action_type == 'check':
+                        # Radios and checkboxes
+                        is_valid = elem_type in ('radio', 'checkbox')
+                    elif action_type == 'submit':
+                        # Submit-like buttons
+                        is_valid = (
+                            elem_type == 'button'
+                            and ('submit' in elem_name or 'send' in elem_name)
+                        )
+                    elif action_type == 'click':
+                        # Generic click: buttons, links, maybe textboxes
+                        is_valid = elem_type in ('button', 'link', 'textbox')
+                    else:
+                        # wait or others: allow any element
+                        is_valid = True
+                    
+                    valid_mask.append(is_valid)
+                
+                num_elements = max(len(elements), 1)
+                valid_mask_tensor = torch.tensor(
+                    valid_mask if len(valid_mask) > 0 else [True],
+                    dtype=torch.bool,
+                    device=element_logits.device,
+                )
+                # Truncate/extend mask to match available logits slice
+                valid_mask_tensor = valid_mask_tensor[:num_elements]
+                if valid_mask_tensor.numel() < num_elements:
+                    pad = torch.ones(num_elements - valid_mask_tensor.numel(), dtype=torch.bool, device=element_logits.device)
+                    valid_mask_tensor = torch.cat([valid_mask_tensor, pad], dim=0)
+                
+                # Apply mask: set invalid element logits to a very negative value
+                masked_element_logits = element_logits[:, :num_elements].clone()
+                masked_element_logits[:, ~valid_mask_tensor] = -1e9
+                
+                element_probs = torch.softmax(masked_element_logits, dim=1)
+                element_idx = torch.argmax(masked_element_logits, dim=1).item()
+
             # Show model predictions
-            print(f"\nModel action probabilities:")
-            for i in range(min(action_encoder.get_action_dim(), 10)):  # Show top 10
-                if i < len(action_encoder.idx_to_action):
-                    action_type, element_ref = action_encoder.idx_to_action[i]
-                    prob = probs[0][i].item()
-                    marker = " <-- SELECTED" if i == action_idx else ""
-                    print(f"  [{i}] {action_type} on {element_ref}: {prob:.3f}{marker}")
+            print("\nModel action type probabilities:")
+            for i, t in enumerate(action_encoder.action_types):
+                prob = action_type_probs[0][i].item()
+                marker = " <-- SELECTED" if i == action_type_idx else ""
+                print(f"  [{i}] {t}: {prob:.3f}{marker}")
             
-            # Decode action
-            action_dict = action_encoder.decode(action_idx)
+            print("\nModel element selection probabilities (first 10):")
+            for i in range(min(len(elements), 10)):
+                elem = elements[i]
+                prob = element_probs[0][i].item()
+                marker = " <-- SELECTED" if i == element_idx else ""
+                print(f"  [{i}] {elem.get('type')} | {elem.get('name', '')[:40]} | {elem.get('ref')}: {prob:.3f}{marker}")
+            
+            # Decode action using current elements
+            action_dict = action_encoder.decode(
+                action_type_idx, element_idx, elements
+            )
             
             # Get element name from current snapshot for display
             elements = extract_elements_from_snapshot(state)
@@ -137,7 +235,7 @@ async def run_policy(task_config_path: str, model_path: str, headless: bool = Tr
             if action_dict['type'] == 'type':
                 # Simple placeholder - in real system, would predict text
                 action_dict['text'] = 'test'
-                print(f"  Note: Using placeholder text 'test' for type action")
+                print("  Note: Using placeholder text 'test' for type action")
             
             # Display action
             display_action(action_dict, step + 1)
@@ -154,11 +252,13 @@ async def run_policy(task_config_path: str, model_path: str, headless: bool = Tr
                 # Check if we're stuck (same action repeatedly)
                 if step > 0 and action_dict.get('element_ref') == last_action_ref:
                     print(f"  ⚠ Warning: Repeated action detected (same element {last_action_ref})")
-                    # Try to break out by selecting a different action
-                    if action_idx < action_encoder.get_action_dim() - 1:
-                        print(f"  Trying alternative action...")
-                        action_idx = (action_idx + 1) % action_encoder.get_action_dim()
-                        action_dict = action_encoder.decode(action_idx)
+                    # Try to break out by selecting a different element (cyclic)
+                    if len(elements) > 1:
+                        print("  Trying alternative element...")
+                        element_idx = (element_idx + 1) % len(elements)
+                        action_dict = action_encoder.decode(
+                            action_type_idx, element_idx, elements
+                        )
                         element_name = next(
                             (e['name'] for e in elements if e.get('ref') == action_dict.get('element_ref', '')),
                             action_dict.get('element_ref', 'unknown')
