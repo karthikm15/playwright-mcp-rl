@@ -9,14 +9,23 @@ from typing import Dict, Any
 
 sys.path.append(str(Path(__file__).parent.parent))
 
-from models.policy import MLPPolicy
+from models.policy import MLPPolicy, PPOPolicy
 from utils.transformer_state_encoder import TransformerStateEncoder
 from utils.action_encoder import ActionEncoder
 from env.browser_env import BrowserEnv
 
 
-def load_model(model_path: str):
-    """Load trained model and encoders."""
+def load_model(model_path: str, policy_type: str = 'bc'):
+    """
+    Load trained model and encoders.
+    
+    Args:
+        model_path: Path to model checkpoint
+        policy_type: 'bc' for Behavior Cloning (MLPPolicy) or 'ppo' for PPO (PPOPolicy)
+    
+    Returns:
+        policy, state_encoder, action_encoder
+    """
     checkpoint = torch.load(model_path, map_location='cpu')
     
     # Reconstruct encoders
@@ -38,18 +47,28 @@ def load_model(model_path: str):
             i: t for i, t in enumerate(saved_action_types)
         }
     
-    # Reconstruct policy
+    # Reconstruct policy based on type
     state_dim = checkpoint['state_dim']
     num_action_types = checkpoint.get(
         'num_action_types', action_encoder.get_num_action_types()
     )
     max_elements = checkpoint.get('max_elements', max_elements)
-    policy = MLPPolicy(
-        state_dim=state_dim,
-        num_action_types=num_action_types,
-        max_elements=max_elements,
-        hidden_dims=[256, 128],
-    )
+    
+    if policy_type.lower() == 'ppo':
+        policy = PPOPolicy(
+            state_dim=state_dim,
+            num_action_types=num_action_types,
+            max_elements=max_elements,
+            hidden_dims=[256, 128],
+        )
+    else:  # default to BC
+        policy = MLPPolicy(
+            state_dim=state_dim,
+            num_action_types=num_action_types,
+            max_elements=max_elements,
+            hidden_dims=[256, 128],
+        )
+    
     policy.load_state_dict(checkpoint['policy_state_dict'])
     policy.eval()
     
@@ -99,16 +118,24 @@ def display_action(action: Dict[str, Any], step: int):
         print(f"  Text: '{text}'")
 
 
-async def run_policy(task_config_path: str, model_path: str, headless: bool = True):
-    """Run trained policy in environment."""
+async def run_policy(task_config_path: str, model_path: str, headless: bool = True, policy_type: str = 'bc'):
+    """
+    Run trained policy in environment.
+    
+    Args:
+        task_config_path: Path to task configuration JSON
+        model_path: Path to model checkpoint
+        headless: Whether to run browser in headless mode
+        policy_type: 'bc' for Behavior Cloning or 'ppo' for PPO
+    """
     # Load task config
     with open(task_config_path, 'r') as f:
         task_config = json.load(f)
     
     # Load model
-    print(f"Loading model from {model_path}...")
-    policy, state_encoder, action_encoder = load_model(model_path)
-    print("Model loaded with compositional action space:")
+    print(f"Loading {policy_type.upper()} model from {model_path}...")
+    policy, state_encoder, action_encoder = load_model(model_path, policy_type=policy_type)
+    print(f"Model loaded ({policy_type.upper()}) with compositional action space:")
     print(f"  Action types: {action_encoder.action_types}")
     
     # Create environment
@@ -141,13 +168,18 @@ async def run_policy(task_config_path: str, model_path: str, headless: bool = Tr
             print(f"\n[Step {step + 1}] Current page has {len(elements)} interactive elements")
             print(f"  Sample elements: {[(e.get('type'), e.get('name', '')[:40], e.get('ref')) for e in elements[:3]]}")
             
-            # Encode state
-            state_tensor = state_encoder.encode_snapshot(state)
+            # Encode state (format as snapshot with elements)
+            snapshot = {'elements': elements}
+            state_tensor = state_encoder.encode_snapshot(snapshot)
             state_tensor = state_tensor.unsqueeze(0)  # Add batch dimension
             
-            # Get action from policy
+            # Get action from policy (PPO returns 3 values, BC returns 2)
             with torch.no_grad():
-                action_type_logits, element_logits = policy(state_tensor)
+                policy_output = policy(state_tensor)
+                if policy_type.lower() == 'ppo':
+                    action_type_logits, element_logits, _ = policy_output
+                else:
+                    action_type_logits, element_logits = policy_output
                 action_type_probs = torch.softmax(action_type_logits, dim=1)
                 
                 # First choose action type
@@ -267,6 +299,7 @@ async def run_policy(task_config_path: str, model_path: str, headless: bool = Tr
                         action_dict['description'] = element_name
                         if action_dict['type'] == 'type':
                             action_dict['text'] = 'test'
+                        print(f"  Alternative action: {action_dict}")
                         # Retry with new action
                         next_state, reward, done, info = await env.step(action_dict)
                         total_reward += reward
@@ -300,14 +333,24 @@ async def run_policy(task_config_path: str, model_path: str, headless: bool = Tr
 
 if __name__ == '__main__':
     import asyncio
+    import argparse
     
-    if len(sys.argv) < 3:
-        print("Usage: python scripts/run_policy.py <task_config_path> <model_path> [--no-headless]")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description='Run trained policy in browser environment')
+    parser.add_argument('task_config', type=str, help='Path to task configuration JSON')
+    parser.add_argument('model_path', type=str, help='Path to model checkpoint')
+    parser.add_argument('--policy-type', type=str, default='bc', choices=['bc', 'ppo'],
+                        help='Type of policy: "bc" for Behavior Cloning or "ppo" for PPO (default: bc)')
+    parser.add_argument('--no-headless', action='store_true',
+                        help='Run browser in visible mode (default is headless)')
     
-    task_config_path = sys.argv[1]
-    model_path = sys.argv[2]
-    headless = '--no-headless' not in sys.argv
+    args = parser.parse_args()
     
-    asyncio.run(run_policy(task_config_path, model_path, headless))
+    headless = not args.no_headless
+    
+    asyncio.run(run_policy(
+        task_config_path=args.task_config,
+        model_path=args.model_path,
+        headless=headless,
+        policy_type=args.policy_type
+    ))
 

@@ -16,7 +16,7 @@ class ActionEncoder:
     def __init__(self):
         """Initialize action encoder."""
         # Fixed action types
-        self.action_types: List[str] = ['click', 'type', 'check', 'submit', 'wait']
+        self.action_types: List[str] = ['click', 'type', 'check', 'submit']
         self.type_to_idx: Dict[str, int] = {
             t: i for i, t in enumerate(self.action_types)
         }
@@ -43,8 +43,8 @@ class ActionEncoder:
         Returns:
             (action_type_idx, element_index)
         """
-        action_type = action.get('type', 'wait')
-        action_type_idx = self.type_to_idx.get(action_type, self.type_to_idx['wait'])
+        action_type = action.get('type', 'click')
+        action_type_idx = self.type_to_idx.get(action_type, self.type_to_idx['click'])
         
         # Map element_ref to index in current_elements
         element_ref = action.get('element_ref', '')
@@ -74,7 +74,7 @@ class ActionEncoder:
             action dict with 'type' and 'element_ref'
         """
         action_type = self.idx_to_type.get(
-            action_type_idx, 'wait'
+            action_type_idx, 'click'
         )
         
         element_ref = ''

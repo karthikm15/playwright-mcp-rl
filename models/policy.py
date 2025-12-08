@@ -4,6 +4,71 @@ import torch
 import torch.nn as nn
 
 
+class PPOPolicy(nn.Module):
+    """
+    PPO policy network with compositional action space and value head.
+    
+    This is a separate policy class specifically for PPO training,
+    with built-in value estimation.
+    """
+    
+    def __init__(
+        self,
+        state_dim: int,
+        num_action_types: int,
+        max_elements: int,
+        hidden_dims: list = [256, 128],
+    ):
+        """
+        Initialize PPO policy.
+        
+        Args:
+            state_dim: Dimension of state encoding
+            num_action_types: Number of discrete action types (e.g., click/type/check/submit)
+            max_elements: Maximum number of elements considered in the state encoding
+            hidden_dims: List of hidden layer dimensions
+        """
+        super().__init__()
+        
+        self.num_action_types = num_action_types
+        self.max_elements = max_elements
+        
+        layers = []
+        prev_dim = state_dim
+        
+        for hidden_dim in hidden_dims:
+            layers.append(nn.Linear(prev_dim, hidden_dim))
+            layers.append(nn.ReLU())
+            prev_dim = hidden_dim
+        
+        self.encoder = nn.Sequential(*layers)
+        
+        # Separate heads for action type and element selection
+        self.action_type_head = nn.Linear(prev_dim, num_action_types)
+        self.element_head = nn.Linear(prev_dim, max_elements)
+        
+        # Value head for RL (estimates state value V(s))
+        self.value_head = nn.Linear(prev_dim, 1)
+    
+    def forward(self, state: torch.Tensor):
+        """
+        Forward pass: returns compositional action logits and value estimate.
+        
+        Args:
+            state: State tensor [batch_size, state_dim]
+        
+        Returns:
+            action_type_logits: [batch_size, num_action_types]
+            element_logits: [batch_size, max_elements]
+            value: [batch_size, 1]
+        """
+        features = self.encoder(state)
+        action_type_logits = self.action_type_head(features)
+        element_logits = self.element_head(features)
+        value = self.value_head(features)
+        return action_type_logits, element_logits, value
+
+
 class MLPPolicy(nn.Module):
     """
     MLP policy network with compositional action space.
@@ -32,7 +97,7 @@ class MLPPolicy(nn.Module):
         
         Args:
             state_dim: Dimension of state encoding
-            num_action_types: Number of discrete action types (e.g., click/type/check/submit/wait)
+            num_action_types: Number of discrete action types (e.g., click/type/check/submit)
             max_elements: Maximum number of elements considered in the state encoding
             hidden_dims: List of hidden layer dimensions
             dropout: Dropout probability for regularization

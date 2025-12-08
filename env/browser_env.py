@@ -8,6 +8,22 @@ from playwright.async_api import async_playwright, Browser, BrowserContext, Page
 class BrowserEnv:
     """Environment wrapper for browser form filling tasks using Playwright."""
     
+    # Irrelevant UI elements to filter out (navigation, help, disclaimers, etc.)
+    IRRELEVANT_PATTERNS = [
+        'sign in to google',
+        'learn more',
+        'google forms',
+        'Google  Forms',
+        'help and feedback',
+        'does this form look suspicious',
+        'clear form',
+        'never submit passwords',
+        'report',
+        'privacy policy',
+        'terms of service',
+        'to save your progress',
+    ]
+    
     def __init__(self, task_config: Dict[str, Any], headless: bool = True):
         """
         Initialize with task configuration.
@@ -46,12 +62,52 @@ class BrowserEnv:
             self.page = await self.context.new_page()
             self._initialized = True
     
-    def _build_ref_mapping(self, node: Dict[str, Any], ref_counter: list) -> Dict[str, Any]:
+    def _is_irrelevant_node(self, node: Dict[str, Any]) -> bool:
+        """Check if a node should be filtered out as irrelevant."""
+        if not node:
+            return True
+        
+        name = str(node.get('name', '')).lower().strip()
+        role = str(node.get('role', '')).lower()
+        
+        # Filter out nodes with irrelevant names
+        for pattern in self.IRRELEVANT_PATTERNS:
+            if pattern.lower() in name.lower():
+                return True
+        
+        # Filter out certain non-interactive roles that are typically UI chrome
+        # (but keep headings as they provide context for form fields)
+        if role in ['generic', 'none'] and not name:
+            return True
+        
+        return False
+    
+    def _build_ref_mapping(self, node: Dict[str, Any], ref_counter: list, is_root: bool = False) -> Optional[Dict[str, Any]]:
         """Recursively build element reference mapping from accessibility tree."""
         if not node:
-            return {}
+            return None
         
-        # Generate ref for this node
+        # Process children first (recursively, so children of irrelevant nodes are still processed)
+        children = node.get('children', [])
+        child_results = []
+        if children:
+            for child in children:
+                if child:
+                    child_result = self._build_ref_mapping(child, ref_counter, is_root=False)
+                    if child_result:
+                        child_results.append(child_result)
+        
+        # Filter out irrelevant nodes (but always keep the root WebArea)
+        if not is_root and self._is_irrelevant_node(node):
+            # Skip this node, but return its relevant children (if any) as a flattened list
+            # This allows children of irrelevant nodes to be promoted to the parent level
+            if child_results:
+                # Return children directly (they become children of the parent)
+                # We need to flatten them into the parent's children list
+                return {'_flatten_children': child_results}
+            return None
+        
+        # Generate ref for this node (it's relevant)
         ref = f"e{ref_counter[0]}"
         ref_counter[0] += 1
         
@@ -88,17 +144,17 @@ class BrowserEnv:
             'checked': checked,  # For radio/checkbox
         }
         
-        # Process children
-        children = node.get('children', [])
-        if children:
-            child_results = []
-            for child in children:
-                if child:  # Skip None children
-                    child_result = self._build_ref_mapping(child, ref_counter)
-                    if child_result:
-                        child_results.append(child_result)
-            if child_results:
-                result['children'] = child_results
+        # Handle children: if any child returned flattened children, include them
+        final_children = []
+        for child_result in child_results:
+            if isinstance(child_result, dict) and '_flatten_children' in child_result:
+                # This child was irrelevant but had relevant children - flatten them
+                final_children.extend(child_result['_flatten_children'])
+            else:
+                final_children.append(child_result)
+        
+        if final_children:
+            result['children'] = final_children
         
         return result
     
@@ -141,6 +197,7 @@ class BrowserEnv:
                             snapshot_node['checked'] = False
             except Exception:
                 # If we can't check the DOM state, keep the accessibility tree value
+                print(f"Error updating element checked state: {e}")
                 pass
         
         # Recursively process children
@@ -163,7 +220,7 @@ class BrowserEnv:
                 # Build ref mapping
                 self.ref_to_node = {}
                 ref_counter = [1]
-                formatted_snapshot = self._build_ref_mapping(snapshot, ref_counter)
+                formatted_snapshot = self._build_ref_mapping(snapshot, ref_counter, is_root=True)
                 
                 # Post-process: Update checked state by checking actual DOM
                 # This ensures we get the correct state even if accessibility tree is stale
@@ -227,8 +284,13 @@ class BrowserEnv:
         await self._ensure_initialized()
         locator = await self._find_locator_by_ref(element_ref)
         if locator:
-            await locator.click()
-            return {'clicked': element_ref}
+            try:
+                await locator.click()
+                return {'clicked': element_ref}
+            except Exception as e:
+                # Element is not clickable or doesn't exist
+                # Silently fail - this is a no-op
+                return {'clicked': element_ref, 'error': 'not_clickable'}
         # Fallback: try description-based locator
         if description:
             try:
@@ -236,7 +298,8 @@ class BrowserEnv:
                     await self.page.get_by_role('button', name=description).click()
                     return {'clicked': element_ref}
             except Exception:
-                pass
+                # Silently fail - this is a no-op
+                return {'clicked': element_ref, 'error': 'not_clickable'}
         return {'clicked': element_ref}
     
     async def _check(self, element_ref: str, description: str = ""):
@@ -244,20 +307,24 @@ class BrowserEnv:
         await self._ensure_initialized()
         locator = await self._find_locator_by_ref(element_ref)
         if locator:
-            # For radio buttons, use click instead of check (Google Forms uses custom radio buttons)
-            node_info = self.ref_to_node.get(element_ref, {})
-            role = node_info.get('role', '')
-            if role == 'radio':
-                await locator.click()
-            else:
-                try:
-                    await locator.check()
-                except Exception:
-                    # If check fails, try click as fallback
+            try:
+                # For radio buttons, use click instead of check (Google Forms uses custom radio buttons)
+                node_info = self.ref_to_node.get(element_ref, {})
+                role = node_info.get('role', '')
+                if role == 'radio':
                     await locator.click()
-            # Wait a bit for DOM state to update before next snapshot
-            await asyncio.sleep(0.2)
-            return {'checked': element_ref}
+                else:
+                    try:
+                        await locator.check()
+                    except Exception:
+                        # If check fails, try click as fallback
+                        await locator.click()
+                await asyncio.sleep(0.2)
+                return {'checked': element_ref}
+            except Exception as e:
+                # Element is not checkable
+                # Silently fail - this is a no-op
+                return {'checked': element_ref, 'error': 'not_checkable'}
         # Fallback: try description-based locator
         if description:
             try:
@@ -276,25 +343,36 @@ class BrowserEnv:
                         await self.page.get_by_role('checkbox', name=name).click()
                     return {'checked': element_ref}
             except Exception:
-                pass
+                # Silently fail - this is a no-op
+                return {'checked': element_ref, 'error': 'not_checkable'}
         
         # Fallback: just click it
-        return await self._click(element_ref, description)
+        try:
+            return await self._click(element_ref, description)
+        except Exception:
+            # Silently fail - this is a no-op
+            return {'checked': element_ref, 'error': 'not_checkable'}
     
     async def _type(self, element_ref: str, text: str, description: str = ""):
         """Type text into element using Playwright."""
         await self._ensure_initialized()
         locator = await self._find_locator_by_ref(element_ref)
         if locator:
-            await locator.fill(text)
-            return {'typed': element_ref, 'text': text}
+            try:
+                await locator.fill(text)
+                return {'typed': element_ref, 'text': text}
+            except Exception as e:
+                # Element is not typeable (e.g., trying to type into a button)
+                # Silently fail - this is a no-op
+                return {'typed': element_ref, 'text': text, 'error': 'not_typeable'}
         # Fallback: try description-based locator
         if description:
             try:
                 await self.page.get_by_placeholder(description).fill(text)
                 return {'typed': element_ref, 'text': text}
             except Exception:
-                pass
+                # Silently fail - this is a no-op
+                return {'typed': element_ref, 'text': text, 'error': 'not_typeable'}
         return {'typed': element_ref, 'text': text}
     
     async def _wait_for(self, text: Optional[str] = None, time: Optional[float] = None):
@@ -391,22 +469,33 @@ class BrowserEnv:
         """
         self.current_step += 1
         
-        # Execute action
+        # Execute action (with error handling - failures are no-ops)
         action_type = action.get('type')
         element_ref = action.get('element_ref', '')
         text = action.get('text', '')
         description = action.get('description', '')
         
-        if action_type == 'click':
-            await self._click(element_ref, description)
-        elif action_type == 'type':
-            await self._type(element_ref, text, description)
-        elif action_type == 'check':
-            await self._check(element_ref, description)
-        elif action_type == 'submit':
-            await self._click(element_ref, description or 'submit button')
-        elif action_type == 'wait':
-            await self._wait_for(time=action.get('time', 0.5))
+        action_success = False
+        try:
+            if action_type == 'click':
+                await self._click(element_ref, description)
+                action_success = True
+            elif action_type == 'type':
+                await self._type(element_ref, text, description)
+                action_success = True
+            elif action_type == 'check':
+                await self._check(element_ref, description)
+                action_success = True
+            elif action_type == 'submit':
+                await self._click(element_ref, description or 'submit button')
+                action_success = True
+            elif action_type == 'wait':
+                await self._wait_for(time=action.get('time', 0.5))
+                action_success = True
+        except Exception as e:
+            # Action failed (e.g., trying to type into a button)
+            # This is a no-op - continue without crashing
+            action_success = False
         
         await self._wait_for(time=0.3)
         state = await self._get_snapshot()
@@ -422,7 +511,12 @@ class BrowserEnv:
             reward = -1.0
             done = True
         
-        info = {'step': self.current_step, 'success': success if done else False, 'action_type': action_type}
+        info = {
+            'step': self.current_step,
+            'success': success if done else False,
+            'action_type': action_type,
+            'action_success': action_success,  # Whether the action executed successfully
+        }
         return state, reward, done, info
     
     async def render(self) -> Dict[str, Any]:
