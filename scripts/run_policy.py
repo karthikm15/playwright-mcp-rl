@@ -10,7 +10,7 @@ from typing import Dict, Any
 sys.path.append(str(Path(__file__).parent.parent))
 
 from models.policy import MLPPolicy
-from utils.state_encoder import StateEncoder
+from utils.transformer_state_encoder import TransformerStateEncoder
 from utils.action_encoder import ActionEncoder
 from env.browser_env import BrowserEnv
 
@@ -22,7 +22,7 @@ def load_model(model_path: str):
     # Reconstruct encoders
     # Use saved max_elements if available; fallback to 50
     max_elements = checkpoint.get('max_elements', 50)
-    state_encoder = StateEncoder(max_elements=max_elements, element_dim=64)
+    state_encoder = TransformerStateEncoder(max_elements=max_elements, d_model=128)
     state_encoder.load_state_dict(checkpoint['state_encoder_state_dict'])
     state_encoder.eval()
     
