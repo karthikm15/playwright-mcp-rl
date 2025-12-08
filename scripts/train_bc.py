@@ -7,12 +7,11 @@ from typing import List, Dict, Any
 
 import torch
 
-from utils.transformer_state_encoder import TransformerStateEncoder
-
+# Add parent directory to path BEFORE importing local modules
 sys.path.append(str(Path(__file__).parent.parent))
 
+from utils.transformer_state_encoder import TransformerStateEncoder
 from models.policy import MLPPolicy
-from utils.state_encoder import StateEncoder
 from utils.action_encoder import ActionEncoder
 from training.bc_trainer import BCTrainer
 

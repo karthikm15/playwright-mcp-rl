@@ -208,8 +208,8 @@ async def run_policy(task_config_path: str, model_path: str, headless: bool = Tr
                 marker = " <-- SELECTED" if i == action_type_idx else ""
                 print(f"  [{i}] {t}: {prob:.3f}{marker}")
             
-            print("\nModel element selection probabilities (first 10):")
-            for i in range(min(len(elements), 10)):
+            print("\nModel element selection probabilities:")
+            for i in range(len(elements)):
                 elem = elements[i]
                 prob = element_probs[0][i].item()
                 marker = " <-- SELECTED" if i == element_idx else ""

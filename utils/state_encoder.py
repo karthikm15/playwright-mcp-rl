@@ -64,7 +64,9 @@ class StateEncoder(nn.Module):
         # State features: capture filled/unfilled status
         # This is critical for detecting small state changes
         value_str = str(element.get('value', ''))
-        checked = element.get('checked', False)
+        # For radio/checkbox, check value field (trajectory format uses "true" for checked)
+        # Also check checked field for backward compatibility
+        checked = element.get('checked', False) or (value_str.lower() == 'true' and elem_type in ['radio', 'checkbox'])
         
         # is_filled: 1 if element has been filled (textbox with text, or checked radio/checkbox)
         is_filled = 0.0

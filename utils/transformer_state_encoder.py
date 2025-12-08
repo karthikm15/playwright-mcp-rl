@@ -96,7 +96,9 @@ class TransformerStateEncoder(nn.Module):
         # This is critical for detecting small state changes
         elem_type_lower = elem_type
         value_str = str(element.get('value', ''))
-        checked = element.get('checked', False)
+        # For radio/checkbox, check value field (trajectory format uses "true" for checked)
+        # Also check checked field for backward compatibility
+        checked = element.get('checked', False) or (value_str.lower() == 'true' and elem_type_lower in ['radio', 'checkbox'])
         
         # is_filled: 1 if element has been filled (textbox with text, or checked radio/checkbox)
         is_filled = 0.0
@@ -170,7 +172,9 @@ class TransformerStateEncoder(nn.Module):
         for elem in elements[:self.max_elements]:
             elem_type = elem.get('type', '').lower()
             value_str = str(elem.get('value', ''))
-            checked = elem.get('checked', False)
+            # For radio/checkbox, check value field (trajectory format uses "true" for checked)
+            # Also check checked field for backward compatibility
+            checked = elem.get('checked', False) or (value_str.lower() == 'true' and elem_type in ['radio', 'checkbox'])
             
             if elem_type == 'textbox':
                 num_textboxes += 1

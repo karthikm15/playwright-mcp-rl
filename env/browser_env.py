@@ -55,23 +55,37 @@ class BrowserEnv:
         ref = f"e{ref_counter[0]}"
         ref_counter[0] += 1
         
+        # Get checked state for radio/checkbox
+        checked = node.get('checked', False)
+        role = node.get('role', '')
+        
+        # For radio buttons and checkboxes, set value based on checked state
+        # This ensures the value field reflects the checked state in trajectories
+        node_value = node.get('value', '')
+        if role in ['radio', 'checkbox']:
+            # If checked, set value to "true", otherwise keep empty string
+            if checked:
+                node_value = "true"
+            else:
+                node_value = ""
+        
         # Store node info
         node_info = {
-            'role': node.get('role', ''),
+            'role': role,
             'name': node.get('name', ''),
-            'value': node.get('value', ''),
+            'value': node_value,
             'description': node.get('description', ''),
-            'checked': node.get('checked', False),  # For radio/checkbox
+            'checked': checked,  # For radio/checkbox
         }
         self.ref_to_node[ref] = node_info
         
         # Build result with ref
         result = {
             'ref': ref,
-            'type': node.get('role', ''),
+            'type': role,
             'name': node.get('name', ''),
-            'value': node.get('value', ''),
-            'checked': node.get('checked', False),  # For radio/checkbox
+            'value': node_value,
+            'checked': checked,  # For radio/checkbox
         }
         
         # Process children
@@ -96,6 +110,48 @@ class BrowserEnv:
         self.current_url = url
         return {'url': url}
     
+    async def _update_element_checked_state(self, snapshot_node: Dict[str, Any]):
+        """Recursively update checked state for radio/checkbox elements by checking DOM."""
+        if not isinstance(snapshot_node, dict):
+            return
+        
+        # Check if this is a radio or checkbox element
+        elem_type = snapshot_node.get('type', '')
+        elem_ref = snapshot_node.get('ref', '')
+        
+        if elem_type in ['radio', 'checkbox'] and elem_ref:
+            # Try to find the element and check its actual DOM state
+            try:
+                node_info = self.ref_to_node.get(elem_ref, {})
+                role = node_info.get('role', '')
+                name = node_info.get('name', '')
+                
+                if role and name:
+                    # Find the element using Playwright
+                    locator = self.page.get_by_role(role, name=name)
+                    if locator:
+                        # Check if it's actually checked in the DOM
+                        is_checked = await locator.is_checked()
+                        # Update the value field based on actual DOM state
+                        if is_checked:
+                            snapshot_node['value'] = 'true'
+                            snapshot_node['checked'] = True
+                        else:
+                            snapshot_node['value'] = ''
+                            snapshot_node['checked'] = False
+            except Exception:
+                # If we can't check the DOM state, keep the accessibility tree value
+                pass
+        
+        # Recursively process children
+        for value in snapshot_node.values():
+            if isinstance(value, dict):
+                await self._update_element_checked_state(value)
+            elif isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict):
+                        await self._update_element_checked_state(item)
+    
     async def _get_snapshot(self) -> Dict[str, Any]:
         """Get accessibility snapshot of current page."""
         await self._ensure_initialized()
@@ -108,6 +164,11 @@ class BrowserEnv:
                 self.ref_to_node = {}
                 ref_counter = [1]
                 formatted_snapshot = self._build_ref_mapping(snapshot, ref_counter)
+                
+                # Post-process: Update checked state by checking actual DOM
+                # This ensures we get the correct state even if accessibility tree is stale
+                await self._update_element_checked_state(formatted_snapshot)
+                
                 self.last_snapshot = formatted_snapshot
                 return formatted_snapshot
         except Exception as e:
@@ -194,6 +255,8 @@ class BrowserEnv:
                 except Exception:
                     # If check fails, try click as fallback
                     await locator.click()
+            # Wait a bit for DOM state to update before next snapshot
+            await asyncio.sleep(0.2)
             return {'checked': element_ref}
         # Fallback: try description-based locator
         if description:

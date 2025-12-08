@@ -111,7 +111,7 @@
           "ref": "e10",
           "type": "radio",
           "name": "Freshman",
-          "value": ""
+          "value": "true"
         },
         {
           "ref": "e12",
@@ -195,7 +195,7 @@
           "ref": "e12",
           "type": "radio",
           "name": "Sophomore",
-          "value": ""
+          "value": "true"
         },
         {
           "ref": "e14",
@@ -279,7 +279,7 @@
           "ref": "e14",
           "type": "radio",
           "name": "Junior",
-          "value": ""
+          "value": "true"
         },
         {
           "ref": "e16",

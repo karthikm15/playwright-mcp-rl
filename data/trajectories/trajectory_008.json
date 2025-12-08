@@ -108,166 +108,10 @@
           "value": ""
         },
         {
-          "ref": "e11",
-          "type": "radio",
-          "name": "Freshman",
-          "value": ""
-        },
-        {
-          "ref": "e13",
-          "type": "radio",
-          "name": "Sophomore",
-          "value": ""
-        },
-        {
-          "ref": "e15",
-          "type": "radio",
-          "name": "Junior",
-          "value": ""
-        },
-        {
-          "ref": "e17",
-          "type": "radio",
-          "name": "Senior",
-          "value": ""
-        },
-        {
-          "ref": "e19",
-          "type": "button",
-          "name": "Submit",
-          "value": ""
-        },
-        {
-          "ref": "e20",
-          "type": "button",
-          "name": "Clear form",
-          "value": ""
-        },
-        {
-          "ref": "e24",
-          "type": "link",
-          "name": "Report",
-          "value": ""
-        },
-        {
-          "ref": "e25",
-          "type": "link",
-          "name": "Google \u00a0Forms",
-          "value": ""
-        },
-        {
-          "ref": "e26",
-          "type": "button",
-          "name": "help and feedback",
-          "value": ""
-        }
-      ]
-    },
-    {
-      "type": "snapshot",
-      "url": "https://forms.gle/8vwKq3BXLqML4HSx8",
-      "elements": [
-        {
-          "ref": "e4",
-          "type": "link",
-          "name": "Sign in to Google",
-          "value": ""
-        },
-        {
-          "ref": "e6",
-          "type": "button",
-          "name": "Learn more",
-          "value": ""
-        },
-        {
-          "ref": "e8",
-          "type": "textbox",
-          "name": "What is your name? Required question",
-          "value": ""
-        },
-        {
-          "ref": "e11",
-          "type": "radio",
-          "name": "Freshman",
-          "value": "true"
-        },
-        {
-          "ref": "e13",
-          "type": "radio",
-          "name": "Sophomore",
-          "value": ""
-        },
-        {
-          "ref": "e15",
-          "type": "radio",
-          "name": "Junior",
-          "value": ""
-        },
-        {
-          "ref": "e17",
-          "type": "radio",
-          "name": "Senior",
-          "value": ""
-        },
-        {
-          "ref": "e19",
-          "type": "button",
-          "name": "Submit",
-          "value": ""
-        },
-        {
-          "ref": "e20",
-          "type": "button",
-          "name": "Clear form",
-          "value": ""
-        },
-        {
-          "ref": "e24",
-          "type": "link",
-          "name": "Report",
-          "value": ""
-        },
-        {
-          "ref": "e25",
-          "type": "link",
-          "name": "Google \u00a0Forms",
-          "value": ""
-        },
-        {
-          "ref": "e26",
-          "type": "button",
-          "name": "help and feedback",
-          "value": ""
-        }
-      ]
-    },
-    {
-      "type": "snapshot",
-      "url": "https://forms.gle/8vwKq3BXLqML4HSx8",
-      "elements": [
-        {
-          "ref": "e4",
-          "type": "link",
-          "name": "Sign in to Google",
-          "value": ""
-        },
-        {
-          "ref": "e6",
-          "type": "button",
-          "name": "Learn more",
-          "value": ""
-        },
-        {
-          "ref": "e8",
-          "type": "textbox",
-          "name": "What is your name? Required question",
-          "value": "hi"
-        },
-        {
           "ref": "e10",
           "type": "radio",
           "name": "Freshman",
-          "value": "true"
+          "value": ""
         },
         {
           "ref": "e12",
@@ -280,6 +124,336 @@
           "type": "radio",
           "name": "Junior",
           "value": ""
+        },
+        {
+          "ref": "e16",
+          "type": "radio",
+          "name": "Senior",
+          "value": ""
+        },
+        {
+          "ref": "e18",
+          "type": "button",
+          "name": "Submit",
+          "value": ""
+        },
+        {
+          "ref": "e19",
+          "type": "button",
+          "name": "Clear form",
+          "value": ""
+        },
+        {
+          "ref": "e23",
+          "type": "link",
+          "name": "Report",
+          "value": ""
+        },
+        {
+          "ref": "e24",
+          "type": "link",
+          "name": "Google \u00a0Forms",
+          "value": ""
+        },
+        {
+          "ref": "e25",
+          "type": "button",
+          "name": "help and feedback",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "type": "snapshot",
+      "url": "https://forms.gle/8vwKq3BXLqML4HSx8",
+      "elements": [
+        {
+          "ref": "e5",
+          "type": "button",
+          "name": "Continue without signing in",
+          "value": ""
+        },
+        {
+          "ref": "e6",
+          "type": "link",
+          "name": "Sign in",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "type": "snapshot",
+      "url": "https://forms.gle/8vwKq3BXLqML4HSx8",
+      "elements": [
+        {
+          "ref": "e4",
+          "type": "link",
+          "name": "Sign in to Google",
+          "value": ""
+        },
+        {
+          "ref": "e6",
+          "type": "button",
+          "name": "Learn more",
+          "value": ""
+        },
+        {
+          "ref": "e8",
+          "type": "textbox",
+          "name": "What is your name? Required question",
+          "value": ""
+        },
+        {
+          "ref": "e10",
+          "type": "radio",
+          "name": "Freshman",
+          "value": ""
+        },
+        {
+          "ref": "e12",
+          "type": "radio",
+          "name": "Sophomore",
+          "value": ""
+        },
+        {
+          "ref": "e14",
+          "type": "radio",
+          "name": "Junior",
+          "value": ""
+        },
+        {
+          "ref": "e16",
+          "type": "radio",
+          "name": "Senior",
+          "value": ""
+        },
+        {
+          "ref": "e18",
+          "type": "button",
+          "name": "Submit",
+          "value": ""
+        },
+        {
+          "ref": "e19",
+          "type": "button",
+          "name": "Clear form",
+          "value": ""
+        },
+        {
+          "ref": "e23",
+          "type": "link",
+          "name": "Report",
+          "value": ""
+        },
+        {
+          "ref": "e24",
+          "type": "link",
+          "name": "Google \u00a0Forms",
+          "value": ""
+        },
+        {
+          "ref": "e25",
+          "type": "button",
+          "name": "help and feedback",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "type": "snapshot",
+      "url": "https://forms.gle/8vwKq3BXLqML4HSx8",
+      "elements": [
+        {
+          "ref": "e4",
+          "type": "link",
+          "name": "Sign in to Google",
+          "value": ""
+        },
+        {
+          "ref": "e6",
+          "type": "button",
+          "name": "Learn more",
+          "value": ""
+        },
+        {
+          "ref": "e8",
+          "type": "textbox",
+          "name": "What is your name? Required question",
+          "value": ""
+        },
+        {
+          "ref": "e10",
+          "type": "radio",
+          "name": "Freshman",
+          "value": ""
+        },
+        {
+          "ref": "e12",
+          "type": "radio",
+          "name": "Sophomore",
+          "value": ""
+        },
+        {
+          "ref": "e14",
+          "type": "radio",
+          "name": "Junior",
+          "value": "true"
+        },
+        {
+          "ref": "e16",
+          "type": "radio",
+          "name": "Senior",
+          "value": ""
+        },
+        {
+          "ref": "e18",
+          "type": "button",
+          "name": "Submit",
+          "value": ""
+        },
+        {
+          "ref": "e19",
+          "type": "button",
+          "name": "Clear form",
+          "value": ""
+        },
+        {
+          "ref": "e23",
+          "type": "link",
+          "name": "Report",
+          "value": ""
+        },
+        {
+          "ref": "e24",
+          "type": "link",
+          "name": "Google \u00a0Forms",
+          "value": ""
+        },
+        {
+          "ref": "e25",
+          "type": "button",
+          "name": "help and feedback",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "type": "snapshot",
+      "url": "https://forms.gle/8vwKq3BXLqML4HSx8",
+      "elements": [
+        {
+          "ref": "e4",
+          "type": "link",
+          "name": "Sign in to Google",
+          "value": ""
+        },
+        {
+          "ref": "e6",
+          "type": "button",
+          "name": "Learn more",
+          "value": ""
+        },
+        {
+          "ref": "e8",
+          "type": "textbox",
+          "name": "What is your name? Required question",
+          "value": ""
+        },
+        {
+          "ref": "e11",
+          "type": "radio",
+          "name": "Freshman",
+          "value": ""
+        },
+        {
+          "ref": "e13",
+          "type": "radio",
+          "name": "Sophomore",
+          "value": ""
+        },
+        {
+          "ref": "e15",
+          "type": "radio",
+          "name": "Junior",
+          "value": "true"
+        },
+        {
+          "ref": "e17",
+          "type": "radio",
+          "name": "Senior",
+          "value": ""
+        },
+        {
+          "ref": "e19",
+          "type": "button",
+          "name": "Submit",
+          "value": ""
+        },
+        {
+          "ref": "e20",
+          "type": "button",
+          "name": "Clear form",
+          "value": ""
+        },
+        {
+          "ref": "e24",
+          "type": "link",
+          "name": "Report",
+          "value": ""
+        },
+        {
+          "ref": "e25",
+          "type": "link",
+          "name": "Google \u00a0Forms",
+          "value": ""
+        },
+        {
+          "ref": "e26",
+          "type": "button",
+          "name": "help and feedback",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "type": "snapshot",
+      "url": "https://forms.gle/8vwKq3BXLqML4HSx8",
+      "elements": [
+        {
+          "ref": "e4",
+          "type": "link",
+          "name": "Sign in to Google",
+          "value": ""
+        },
+        {
+          "ref": "e6",
+          "type": "button",
+          "name": "Learn more",
+          "value": ""
+        },
+        {
+          "ref": "e8",
+          "type": "textbox",
+          "name": "What is your name? Required question",
+          "value": "adi"
+        },
+        {
+          "ref": "e10",
+          "type": "radio",
+          "name": "Freshman",
+          "value": ""
+        },
+        {
+          "ref": "e12",
+          "type": "radio",
+          "name": "Sophomore",
+          "value": ""
+        },
+        {
+          "ref": "e14",
+          "type": "radio",
+          "name": "Junior",
+          "value": "true"
         },
         {
           "ref": "e16",
@@ -346,23 +520,41 @@
   ],
   "actions": [
     {
+      "type": "click",
+      "element_ref": "e25",
+      "name": "help and feedback",
+      "description": "help and feedback"
+    },
+    {
+      "type": "click",
+      "element_ref": "e6",
+      "name": "Learn more",
+      "description": "Learn more"
+    },
+    {
+      "type": "click",
+      "element_ref": "e5",
+      "name": "Continue without signing in",
+      "description": "Continue without signing in"
+    },
+    {
+      "type": "check",
+      "element_ref": "e14",
+      "name": "Junior",
+      "description": "Junior"
+    },
+    {
       "type": "submit",
       "element_ref": "e18",
       "name": "Submit",
       "description": "Submit"
     },
     {
-      "type": "check",
-      "element_ref": "e11",
-      "name": "Freshman",
-      "description": "Freshman"
-    },
-    {
       "type": "type",
       "element_ref": "e8",
       "name": "What is your name? Required question",
       "description": "What is your name? Required question",
-      "text": "hi"
+      "text": "adi"
     },
     {
       "type": "submit",
@@ -372,12 +564,18 @@
     }
   ],
   "rewards": [
-    -1.0,
     -0.1,
+    -0.1,
+    -0.1,
+    -0.1,
+    -1.0,
     -0.1,
     1.0
   ],
   "dones": [
+    false,
+    false,
+    false,
     false,
     false,
     false,

@@ -285,7 +285,7 @@
           "ref": "e16",
           "type": "radio",
           "name": "Senior",
-          "value": ""
+          "value": "true"
         },
         {
           "ref": "e18",
