@@ -197,7 +197,6 @@ class BrowserEnv:
                             snapshot_node['checked'] = False
             except Exception:
                 # If we can't check the DOM state, keep the accessibility tree value
-                print(f"Error updating element checked state: {e}")
                 pass
         
         # Recursively process children
@@ -208,6 +207,38 @@ class BrowserEnv:
                 for item in value:
                     if isinstance(item, dict):
                         await self._update_element_checked_state(item)
+    
+    async def _update_element_textbox_value(self, snapshot_node: Dict[str, Any]):
+        """Recursively update textbox values by checking actual DOM state."""
+        if not isinstance(snapshot_node, dict):
+            return
+        
+        # Check if this is a textbox element
+        elem_type = snapshot_node.get('type', '')
+        elem_ref = snapshot_node.get('ref', '')
+        
+        if elem_type == 'textbox' and elem_ref:
+            # Try to find the element and get its actual DOM value
+            try:
+                # Use the same locator finding logic as _find_locator_by_ref
+                locator = await self._find_locator_by_ref(elem_ref)
+                if locator:
+                    # Get the actual input value from the DOM
+                    input_value = await locator.input_value()
+                    # Update the value field with the actual DOM value
+                    snapshot_node['value'] = input_value
+            except Exception:
+                # If we can't get the DOM value, keep the accessibility tree value
+                pass
+        
+        # Recursively process children
+        for value in snapshot_node.values():
+            if isinstance(value, dict):
+                await self._update_element_textbox_value(value)
+            elif isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict):
+                        await self._update_element_textbox_value(item)
     
     async def _get_snapshot(self) -> Dict[str, Any]:
         """Get accessibility snapshot of current page."""
@@ -222,9 +253,10 @@ class BrowserEnv:
                 ref_counter = [1]
                 formatted_snapshot = self._build_ref_mapping(snapshot, ref_counter, is_root=True)
                 
-                # Post-process: Update checked state by checking actual DOM
+                # Post-process: Update checked state and textbox values by checking actual DOM
                 # This ensures we get the correct state even if accessibility tree is stale
                 await self._update_element_checked_state(formatted_snapshot)
+                await self._update_element_textbox_value(formatted_snapshot)
                 
                 self.last_snapshot = formatted_snapshot
                 return formatted_snapshot
@@ -498,10 +530,47 @@ class BrowserEnv:
             action_success = False
         
         await self._wait_for(time=0.3)
+        
+        # Store previous state BEFORE getting new snapshot (deep copy)
+        import copy
+        prev_state = copy.deepcopy(self.last_snapshot) if self.last_snapshot else {}
+        prev_filled = self._count_filled_fields(prev_state) if prev_state else 0
+        
+        # Get new state (this will update self.last_snapshot)
         state = await self._get_snapshot()
         
         done = False
-        reward = -0.1
+        reward = -0.1  # Base step penalty
+        
+        # Check for intermediate rewards/penalties
+        # Count filled fields after action
+        curr_filled = self._count_filled_fields(state)
+        
+        # Reward for filling a new field
+        if curr_filled > prev_filled:
+            reward += 0.2 * (curr_filled - prev_filled)  # +0.2 per field filled
+        
+        # Penalty for redundant actions (typing into already-filled textbox, checking already-checked radio)
+        if action_type == 'type':
+            # Check if we tried to type into an already-filled textbox
+            element_ref = action.get('element_ref', '')
+            if element_ref:
+                # Find the element in previous state
+                prev_elem = self._find_element_by_ref(prev_state, element_ref)
+                if prev_elem and prev_elem.get('type', '').lower() == 'textbox':
+                    prev_value = str(prev_elem.get('value', '')).strip()
+                    if prev_value:  # Textbox was already filled
+                        reward -= 0.2  # Penalty for redundant typing
+        elif action_type == 'check':
+            # Check if we tried to check an already-checked radio/checkbox
+            element_ref = action.get('element_ref', '')
+            if element_ref:
+                prev_elem = self._find_element_by_ref(prev_state, element_ref)
+                if prev_elem:
+                    prev_checked = prev_elem.get('checked', False) or str(prev_elem.get('value', '')).lower() == 'true'
+                    if prev_checked:
+                        reward -= 0.2  # Penalty for redundant checking
+        
         success = await self._check_success()
         
         if success:
@@ -518,6 +587,60 @@ class BrowserEnv:
             'action_success': action_success,  # Whether the action executed successfully
         }
         return state, reward, done, info
+    
+    def _count_filled_fields(self, snapshot: Dict[str, Any]) -> int:
+        """Count number of filled fields (textboxes with text, checked radios/checkboxes)."""
+        count = 0
+        
+        def traverse(node):
+            nonlocal count
+            if not isinstance(node, dict):
+                return
+            
+            elem_type = node.get('type', '').lower()
+            value_str = str(node.get('value', '')).strip()
+            checked = node.get('checked', False)
+            
+            if elem_type == 'textbox' and value_str:
+                count += 1
+            elif elem_type in ['radio', 'checkbox'] and (checked or value_str.lower() == 'true'):
+                count += 1
+            
+            # Recursively check children
+            for value in node.values():
+                if isinstance(value, dict):
+                    traverse(value)
+                elif isinstance(value, list):
+                    for item in value:
+                        if isinstance(item, dict):
+                            traverse(item)
+        
+        traverse(snapshot)
+        return count
+    
+    def _find_element_by_ref(self, snapshot: Dict[str, Any], element_ref: str) -> Optional[Dict[str, Any]]:
+        """Find an element by its ref in the snapshot tree."""
+        def search(node):
+            if not isinstance(node, dict):
+                return None
+            
+            if node.get('ref') == element_ref:
+                return node
+            
+            # Recursively search children
+            for value in node.values():
+                if isinstance(value, dict):
+                    result = search(value)
+                    if result:
+                        return result
+                elif isinstance(value, list):
+                    for item in value:
+                        if isinstance(item, dict):
+                            result = search(item)
+                            if result:
+                                return result
+        
+        return search(snapshot)
     
     async def render(self) -> Dict[str, Any]:
         """Get current state snapshot."""
