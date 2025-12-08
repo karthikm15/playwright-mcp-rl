@@ -24,6 +24,8 @@ class MLPPolicy(nn.Module):
         num_action_types: int,
         max_elements: int,
         hidden_dims: list = [256, 128],
+        dropout: float = 0.2,
+        use_layer_norm: bool = True,
     ):
         """
         Initialize MLP policy.
@@ -33,27 +35,57 @@ class MLPPolicy(nn.Module):
             num_action_types: Number of discrete action types (e.g., click/type/check/submit/wait)
             max_elements: Maximum number of elements considered in the state encoding
             hidden_dims: List of hidden layer dimensions
+            dropout: Dropout probability for regularization
+            use_layer_norm: Whether to use layer normalization
         """
         super().__init__()
         
         self.num_action_types = num_action_types
         self.max_elements = max_elements
+        self.use_layer_norm = use_layer_norm
         
+        # Build encoder with optional layer norm and dropout
         layers = []
         prev_dim = state_dim
         
-        for hidden_dim in hidden_dims:
+        for i, hidden_dim in enumerate(hidden_dims):
             layers.append(nn.Linear(prev_dim, hidden_dim))
+            
+            # Add layer normalization for better training stability
+            if use_layer_norm:
+                layers.append(nn.LayerNorm(hidden_dim))
+            
             layers.append(nn.ReLU())
+            
+            # Add dropout for regularization (important with limited data)
+            if dropout > 0:
+                layers.append(nn.Dropout(dropout))
+            
             prev_dim = hidden_dim
         
         self.encoder = nn.Sequential(*layers)
         
         # Separate heads for action type and element selection
-        self.action_type_head = nn.Linear(prev_dim, num_action_types)
+        # Use slightly larger hidden dim for heads to allow more capacity
+        head_hidden = prev_dim // 2 if prev_dim > 64 else prev_dim
+        
+        # Action type head with intermediate layer for better representation
+        self.action_type_mlp = nn.Sequential(
+            nn.Linear(prev_dim, head_hidden),
+            nn.ReLU(),
+            nn.Dropout(dropout * 0.5) if dropout > 0 else nn.Identity(),
+        )
+        self.action_type_head = nn.Linear(head_hidden, num_action_types)
+        
+        # Element selection head with intermediate layer
+        self.element_mlp = nn.Sequential(
+            nn.Linear(prev_dim, head_hidden),
+            nn.ReLU(),
+            nn.Dropout(dropout * 0.5) if dropout > 0 else nn.Identity(),
+        )
         # We produce logits for max_elements positions; any unused tail positions
         # can be masked out by the caller if needed.
-        self.element_head = nn.Linear(prev_dim, max_elements)
+        self.element_head = nn.Linear(head_hidden, max_elements)
     
     def forward(self, state: torch.Tensor):
         """
@@ -67,7 +99,13 @@ class MLPPolicy(nn.Module):
             element_logits: [batch_size, max_elements]
         """
         features = self.encoder(state)
-        action_type_logits = self.action_type_head(features)
-        element_logits = self.element_head(features)
+        
+        # Process through separate heads
+        action_type_features = self.action_type_mlp(features)
+        action_type_logits = self.action_type_head(action_type_features)
+        
+        element_features = self.element_mlp(features)
+        element_logits = self.element_head(element_features)
+        
         return action_type_logits, element_logits
 

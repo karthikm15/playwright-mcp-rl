@@ -65,10 +65,15 @@ def main():
     )
     
     # Training config
+    # With limited data (62 samples), use smaller batch size and lower learning rate
     config = {
-        'learning_rate': 1e-2,
-        'batch_size': 32,
-        'num_epochs': 200
+        'learning_rate': 1e-3,  # Reduced from 1e-2 for more stable training
+        'batch_size': 16,  # Smaller batch size for better gradient estimates with limited data
+        'num_epochs': 400,
+        'gradient_clip': 1.0,  # Clip gradients to prevent explosion
+        'freeze_encoder_epochs': 25,  # Freeze state encoder for first N epochs (25 = ~100 batches with 62 samples)
+        'adaptive_unfreeze': True,  # Unfreeze when policy loss drops below threshold
+        'unfreeze_loss_threshold': 1.5,  # Unfreeze when avg_loss < this value
     }
     
     # Train

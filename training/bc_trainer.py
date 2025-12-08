@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from typing import List, Dict, Any
+from tqdm import tqdm
 
 
 class TrajectoryDataset(Dataset):
@@ -73,10 +74,23 @@ class BCTrainer:
         self.config = config
         
         # Combine parameters from policy and state encoder
-        params = list(policy.parameters()) + list(state_encoder.parameters())
+        self.policy_params = list(policy.parameters())
+        self.encoder_params = list(state_encoder.parameters())
+        params = self.policy_params + self.encoder_params
         self.optimizer = torch.optim.Adam(
             params,
-            lr=config.get('learning_rate', 1e-3)
+            lr=config.get('learning_rate', 1e-3),
+            weight_decay=1e-5  # Small weight decay for regularization
+        )
+        self.gradient_clip = config.get('gradient_clip', None)
+        self.freeze_encoder_epochs = config.get('freeze_encoder_epochs', 0)
+        self.adaptive_unfreeze = config.get('adaptive_unfreeze', False)
+        self.unfreeze_loss_threshold = config.get('unfreeze_loss_threshold', 1.5)
+        self.encoder_frozen = True  # Track if encoder is currently frozen
+        
+        # Learning rate scheduler - reduce LR when loss plateaus
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            self.optimizer, mode='min', factor=0.5, patience=20, verbose=True
         )
         # Separate losses for action type and element index
         self.action_type_criterion = nn.CrossEntropyLoss()
@@ -108,12 +122,45 @@ class BCTrainer:
         num_epochs = self.config.get('num_epochs', 100)
         
         print(f"\nTraining for {num_epochs} epochs...")
+        print(f"Dataset size: {len(dataset)} samples, Batch size: {self.config.get('batch_size', 32)}")
+        print(f"Total batches per epoch: {len(dataloader)}\n")
         
-        for epoch in range(num_epochs):
+        # Progress bar for epochs
+        epoch_pbar = tqdm(range(num_epochs), desc="Training", unit="epoch")
+        
+        # Freeze/unfreeze encoder based on config
+        for param in self.encoder_params:
+            param.requires_grad = (self.freeze_encoder_epochs == 0)
+        
+        for epoch in epoch_pbar:
+            # Unfreeze encoder logic
+            should_unfreeze = False
+            unfreeze_reason = ""
+            
+            if self.encoder_frozen:
+                # Check if we should unfreeze based on epoch count
+                if epoch >= self.freeze_encoder_epochs:
+                    should_unfreeze = True
+                    unfreeze_reason = f"reached epoch {epoch + 1}"
+                # Or check if we should unfreeze adaptively based on loss
+                elif self.adaptive_unfreeze and epoch > 0:
+                    # We'll check loss after computing it
+                    pass
+            
             total_loss = 0.0
+            total_loss_type = 0.0
+            total_loss_element = 0.0
+            num_batches = 0
+            total_loss = 0.0
+            total_loss_type = 0.0
+            total_loss_element = 0.0
             num_batches = 0
             
-            for states, action_type_targets, element_targets in dataloader:
+            # Progress bar for batches within each epoch
+            batch_pbar = tqdm(dataloader, desc=f"Epoch {epoch+1}/{num_epochs}", 
+                            leave=False, unit="batch")
+            
+            for states, action_type_targets, element_targets in batch_pbar:
                 states = states.to(self.device)
                 action_type_targets = action_type_targets.to(self.device)
                 element_targets = element_targets.to(self.device)
@@ -131,15 +178,67 @@ class BCTrainer:
                 # Backward pass
                 self.optimizer.zero_grad()
                 loss.backward()
+                
+                # Gradient clipping to prevent explosion
+                if self.gradient_clip is not None:
+                    # Get all parameters that require gradients
+                    all_params = [p for p in self.policy.parameters() if p.requires_grad]
+                    all_params += [p for p in self.state_encoder.parameters() if p.requires_grad]
+                    if all_params:
+                        torch.nn.utils.clip_grad_norm_(all_params, self.gradient_clip)
+                
                 self.optimizer.step()
                 
                 total_loss += loss.item()
+                total_loss_type += loss_type.item()
+                total_loss_element += loss_element.item()
                 num_batches += 1
+                
+                # Update batch progress bar with current loss
+                batch_pbar.set_postfix({'loss': f'{loss.item():.4f}'})
             
             avg_loss = total_loss / num_batches if num_batches > 0 else 0.0
+            avg_loss_type = total_loss_type / num_batches if num_batches > 0 else 0.0
+            avg_loss_element = total_loss_element / num_batches if num_batches > 0 else 0.0
             
-            if (epoch + 1) % 10 == 0:
-                print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {avg_loss:.4f}")
+            # Check adaptive unfreeze based on loss
+            if self.encoder_frozen and self.adaptive_unfreeze and epoch > 0:
+                if avg_loss < self.unfreeze_loss_threshold:
+                    should_unfreeze = True
+                    unfreeze_reason = f"loss dropped to {avg_loss:.4f} < {self.unfreeze_loss_threshold}"
+            
+            # Unfreeze encoder if conditions are met
+            if should_unfreeze and self.encoder_frozen:
+                for param in self.encoder_params:
+                    param.requires_grad = True
+                # Recreate optimizer with encoder params
+                params = self.policy_params + self.encoder_params
+                self.optimizer = torch.optim.Adam(
+                    params,
+                    lr=self.config.get('learning_rate', 1e-3),
+                    weight_decay=1e-5
+                )
+                # Recreate scheduler for new optimizer
+                self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                    self.optimizer, mode='min', factor=0.5, patience=20, verbose=True
+                )
+                self.encoder_frozen = False
+                print(f"\n✓ Unfreezing state encoder at epoch {epoch + 1} ({unfreeze_reason})")
+            
+            # Update learning rate scheduler
+            self.scheduler.step(avg_loss)
+            current_lr = self.optimizer.param_groups[0]['lr']
+            
+            # Update epoch progress bar
+            frozen_indicator = " [FROZEN]" if self.encoder_frozen else ""
+            epoch_pbar.set_postfix({
+                'avg_loss': f'{avg_loss:.4f}',
+                'loss_type': f'{avg_loss_type:.4f}',
+                'loss_element': f'{avg_loss_element:.4f}',
+                'lr': f'{current_lr:.2e}'
+            })
+            epoch_pbar.set_description(f"Training{frozen_indicator}")
         
-        print("Training complete!")
+        epoch_pbar.close()
+        print("\n✓ Training complete!")
 

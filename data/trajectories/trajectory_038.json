@@ -1,0 +1,424 @@
+{
+  "task": {
+    "url": "https://forms.gle/eVnWKpJc1HogvuqMA",
+    "field_selector": "input[name='custname']",
+    "submit_selector": "input[type='submit']",
+    "success_condition": "Your response has been recorded.",
+    "max_steps": 50
+  },
+  "observations": [
+    {
+      "type": "snapshot",
+      "url": "https://forms.gle/eVnWKpJc1HogvuqMA",
+      "elements": [
+        {
+          "ref": "e4",
+          "type": "link",
+          "name": "Sign in to Google",
+          "value": ""
+        },
+        {
+          "ref": "e6",
+          "type": "button",
+          "name": "Learn more",
+          "value": ""
+        },
+        {
+          "ref": "e8",
+          "type": "textbox",
+          "name": "what is your name\u00a0 Required question",
+          "value": ""
+        },
+        {
+          "ref": "e10",
+          "type": "radio",
+          "name": "10",
+          "value": ""
+        },
+        {
+          "ref": "e12",
+          "type": "radio",
+          "name": "11",
+          "value": ""
+        },
+        {
+          "ref": "e14",
+          "type": "button",
+          "name": "Submit",
+          "value": ""
+        },
+        {
+          "ref": "e15",
+          "type": "button",
+          "name": "Clear form",
+          "value": ""
+        },
+        {
+          "ref": "e18",
+          "type": "link",
+          "name": "Terms of Service",
+          "value": ""
+        },
+        {
+          "ref": "e20",
+          "type": "link",
+          "name": "Privacy Policy",
+          "value": ""
+        },
+        {
+          "ref": "e22",
+          "type": "link",
+          "name": "Report",
+          "value": ""
+        },
+        {
+          "ref": "e23",
+          "type": "link",
+          "name": "Google \u00a0Forms",
+          "value": ""
+        },
+        {
+          "ref": "e24",
+          "type": "button",
+          "name": "help and feedback",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "type": "snapshot",
+      "url": "https://forms.gle/eVnWKpJc1HogvuqMA",
+      "elements": [
+        {
+          "ref": "e4",
+          "type": "link",
+          "name": "Sign in to Google",
+          "value": ""
+        },
+        {
+          "ref": "e6",
+          "type": "button",
+          "name": "Learn more",
+          "value": ""
+        },
+        {
+          "ref": "e8",
+          "type": "textbox",
+          "name": "what is your name\u00a0 Required question",
+          "value": "a"
+        },
+        {
+          "ref": "e10",
+          "type": "radio",
+          "name": "10",
+          "value": ""
+        },
+        {
+          "ref": "e12",
+          "type": "radio",
+          "name": "11",
+          "value": ""
+        },
+        {
+          "ref": "e14",
+          "type": "button",
+          "name": "Submit",
+          "value": ""
+        },
+        {
+          "ref": "e15",
+          "type": "button",
+          "name": "Clear form",
+          "value": ""
+        },
+        {
+          "ref": "e18",
+          "type": "link",
+          "name": "Terms of Service",
+          "value": ""
+        },
+        {
+          "ref": "e20",
+          "type": "link",
+          "name": "Privacy Policy",
+          "value": ""
+        },
+        {
+          "ref": "e22",
+          "type": "link",
+          "name": "Report",
+          "value": ""
+        },
+        {
+          "ref": "e23",
+          "type": "link",
+          "name": "Google \u00a0Forms",
+          "value": ""
+        },
+        {
+          "ref": "e24",
+          "type": "button",
+          "name": "help and feedback",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "type": "snapshot",
+      "url": "https://forms.gle/eVnWKpJc1HogvuqMA",
+      "elements": [
+        {
+          "ref": "e4",
+          "type": "link",
+          "name": "Sign in to Google",
+          "value": ""
+        },
+        {
+          "ref": "e6",
+          "type": "button",
+          "name": "Learn more",
+          "value": ""
+        },
+        {
+          "ref": "e8",
+          "type": "textbox",
+          "name": "what is your name\u00a0 Required question",
+          "value": "a"
+        },
+        {
+          "ref": "e10",
+          "type": "radio",
+          "name": "10",
+          "value": "true"
+        },
+        {
+          "ref": "e12",
+          "type": "radio",
+          "name": "11",
+          "value": ""
+        },
+        {
+          "ref": "e14",
+          "type": "button",
+          "name": "Submit",
+          "value": ""
+        },
+        {
+          "ref": "e15",
+          "type": "button",
+          "name": "Clear form",
+          "value": ""
+        },
+        {
+          "ref": "e18",
+          "type": "link",
+          "name": "Terms of Service",
+          "value": ""
+        },
+        {
+          "ref": "e20",
+          "type": "link",
+          "name": "Privacy Policy",
+          "value": ""
+        },
+        {
+          "ref": "e22",
+          "type": "link",
+          "name": "Report",
+          "value": ""
+        },
+        {
+          "ref": "e23",
+          "type": "link",
+          "name": "Google \u00a0Forms",
+          "value": ""
+        },
+        {
+          "ref": "e24",
+          "type": "button",
+          "name": "help and feedback",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "type": "snapshot",
+      "url": "https://forms.gle/eVnWKpJc1HogvuqMA",
+      "elements": [
+        {
+          "ref": "e5",
+          "type": "button",
+          "name": "Cancel",
+          "value": ""
+        },
+        {
+          "ref": "e6",
+          "type": "button",
+          "name": "Clear form",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "type": "snapshot",
+      "url": "https://forms.gle/eVnWKpJc1HogvuqMA",
+      "elements": [
+        {
+          "ref": "e4",
+          "type": "link",
+          "name": "Sign in to Google",
+          "value": ""
+        },
+        {
+          "ref": "e6",
+          "type": "button",
+          "name": "Learn more",
+          "value": ""
+        },
+        {
+          "ref": "e8",
+          "type": "textbox",
+          "name": "what is your name\u00a0 Required question",
+          "value": "a"
+        },
+        {
+          "ref": "e10",
+          "type": "radio",
+          "name": "10",
+          "value": "true"
+        },
+        {
+          "ref": "e12",
+          "type": "radio",
+          "name": "11",
+          "value": ""
+        },
+        {
+          "ref": "e14",
+          "type": "button",
+          "name": "Submit",
+          "value": ""
+        },
+        {
+          "ref": "e15",
+          "type": "button",
+          "name": "Clear form",
+          "value": ""
+        },
+        {
+          "ref": "e18",
+          "type": "link",
+          "name": "Terms of Service",
+          "value": ""
+        },
+        {
+          "ref": "e20",
+          "type": "link",
+          "name": "Privacy Policy",
+          "value": ""
+        },
+        {
+          "ref": "e22",
+          "type": "link",
+          "name": "Report",
+          "value": ""
+        },
+        {
+          "ref": "e23",
+          "type": "link",
+          "name": "Google \u00a0Forms",
+          "value": ""
+        },
+        {
+          "ref": "e24",
+          "type": "button",
+          "name": "help and feedback",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "type": "snapshot",
+      "url": "https://forms.gle/eVnWKpJc1HogvuqMA",
+      "elements": [
+        {
+          "ref": "e4",
+          "type": "link",
+          "name": "Submit another response",
+          "value": ""
+        },
+        {
+          "ref": "e6",
+          "type": "link",
+          "name": "Terms of Service",
+          "value": ""
+        },
+        {
+          "ref": "e8",
+          "type": "link",
+          "name": "Privacy Policy",
+          "value": ""
+        },
+        {
+          "ref": "e10",
+          "type": "link",
+          "name": "Report",
+          "value": ""
+        },
+        {
+          "ref": "e11",
+          "type": "link",
+          "name": "Google \u00a0Forms",
+          "value": ""
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "type": "type",
+      "element_ref": "e8",
+      "name": "what is your name\u00a0 Required question",
+      "description": "what is your name\u00a0 Required question",
+      "text": "a"
+    },
+    {
+      "type": "check",
+      "element_ref": "e10",
+      "name": "10",
+      "description": "10"
+    },
+    {
+      "type": "click",
+      "element_ref": "e15",
+      "name": "Clear form",
+      "description": "Clear form"
+    },
+    {
+      "type": "click",
+      "element_ref": "e5",
+      "name": "Cancel",
+      "description": "Cancel"
+    },
+    {
+      "type": "submit",
+      "element_ref": "e14",
+      "name": "Submit",
+      "description": "Submit"
+    }
+  ],
+  "rewards": [
+    -0.1,
+    -0.1,
+    -0.1,
+    -0.1,
+    1.0
+  ],
+  "dones": [
+    false,
+    false,
+    false,
+    false,
+    true
+  ]
+}
