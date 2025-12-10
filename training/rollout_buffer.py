@@ -2,7 +2,6 @@
 
 import torch
 from typing import List, Dict, Any
-import numpy as np
 
 
 class RolloutBuffer:
@@ -103,6 +102,16 @@ class RolloutBuffer:
         self.dones.clear()
         self.log_probs.clear()
         self.values.clear()
+    
+    def merge(self, other: 'RolloutBuffer'):
+        """Merge another buffer into this one."""
+        self.states.extend(other.states)
+        self.actions_type.extend(other.actions_type)
+        self.actions_element.extend(other.actions_element)
+        self.rewards.extend(other.rewards)
+        self.dones.extend(other.dones)
+        self.log_probs.extend(other.log_probs)
+        self.values.extend(other.values)
     
     def __len__(self):
         return len(self.states)

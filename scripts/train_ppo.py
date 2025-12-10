@@ -6,7 +6,7 @@ import sys
 import torch
 import torch.nn.functional as F
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Tuple, List
 
 sys.path.append(str(Path(__file__).parent.parent))
 
@@ -47,7 +47,9 @@ def build_validity_mask(action_type: str, elements: list, max_elements: int, dev
         
         is_valid = False
         if action_type == 'type':
-            is_valid = elem_type == 'textbox'
+            # Only allow typing into empty textboxes
+            value_str = str(elem.get('value', '')).strip()
+            is_valid = elem_type == 'textbox' and not value_str
         elif action_type == 'check':
             is_valid = elem_type in ('radio', 'checkbox')
         elif action_type == 'submit':
@@ -86,7 +88,7 @@ async def collect_rollout(
     step = 0
     
     while not done and step < max_steps:
-        print(f"Step {step+1}/{max_steps}")
+        
         # Extract elements and encode state
         elements = extract_elements_from_snapshot(state)
         snapshot = {'elements': elements}
@@ -96,7 +98,6 @@ async def collect_rollout(
         with torch.no_grad():
             action_type_logits, element_logits, value = policy(state_tensor)
             value = value.item()
-            print(f"Value: {value}")
             # Sample action type
             action_type_probs = F.softmax(action_type_logits, dim=-1)
             action_type_idx = torch.multinomial(action_type_probs, 1).item()
@@ -118,7 +119,6 @@ async def collect_rollout(
         
         # Decode action
         action_dict = action_encoder.decode(action_type_idx, element_idx, elements)
-        print(f"Action: {action_dict}")
         # Add text for type actions
         if action_type == 'type' and elements[element_idx].get('type', '').lower() == 'textbox':
             action_dict['text'] = 'Test User'  # Simple default text
@@ -136,6 +136,7 @@ async def collect_rollout(
         
         # Step environment - this executes the action and returns (s_{t+1}, r_t, done, info)
         next_state, reward, done, info = await env.step(action_dict)
+        print(f"Step {step+1}/{max_steps} reward: {reward} action: {action_dict}")
         
         # Update the reward and done for the last stored step (r_t corresponds to action a_t)
         if len(buffer.rewards) > 0:
@@ -158,6 +159,52 @@ async def collect_rollout(
         final_value = 0.0
     
     return step, done, info.get('success', False), final_value
+
+
+async def collect_rollout_parallel(
+    task_config: Dict[str, Any],
+    policy: PPOPolicy,
+    state_encoder: TransformerStateEncoder,
+    action_encoder: ActionEncoder,
+    device: str,
+    max_steps: int,
+    headless: bool,
+    num_rollouts: int,
+) -> Tuple[RolloutBuffer, List[Tuple[int, bool, bool, float]]]:
+    """Collect multiple rollouts in parallel."""
+    
+    async def single_rollout(rollout_idx: int):
+        """Collect a single rollout with its own environment."""
+        # Create separate environment for this rollout
+        env = BrowserEnv(task_config, headless=headless)
+        buffer = RolloutBuffer()
+        
+        try:
+            steps, done, success, final_value = await collect_rollout(
+                env, policy, state_encoder, action_encoder, buffer, device, max_steps
+            )
+            
+            # Update final value for non-terminated episodes
+            if not done and len(buffer.values) > 0:
+                buffer.values[-1] = final_value
+            
+            return buffer, (steps, done, success, final_value)
+        finally:
+            await env.close()
+    
+    # Run all rollouts in parallel
+    print(f"Collecting {num_rollouts} rollouts in parallel...")
+    results = await asyncio.gather(*[single_rollout(i) for i in range(num_rollouts)])
+    
+    # Merge all buffers
+    merged_buffer = RolloutBuffer()
+    rollout_stats = []
+    
+    for buffer, stats in results:
+        merged_buffer.merge(buffer)
+        rollout_stats.append(stats)
+    
+    return merged_buffer, rollout_stats
 
 
 async def train_ppo(
@@ -198,10 +245,8 @@ async def train_ppo(
         action_encoder=action_encoder,
         optimizer=optimizer,
         device=device,
+        entropy_coef=0.05,  # Increased from 0.01 for more exploration
     )
-    
-    # Create environment
-    env = BrowserEnv(task_config, headless=headless)
     
     buffer = RolloutBuffer()
     
@@ -211,26 +256,16 @@ async def train_ppo(
     print("-" * 60)
     
     for update in range(num_updates):
-        # Collect rollouts
-        total_steps = 0
-        total_success = 0
+        # Collect rollouts in parallel
         buffer.clear()
+        buffer, rollout_stats = await collect_rollout_parallel(
+            task_config, policy, state_encoder, action_encoder, device,
+            max_steps, headless, num_rollouts
+        )
         
-        for rollout_idx in range(num_rollouts):
-            print(f"Collecting rollout {rollout_idx+1}/{num_rollouts}")
-            steps, done, success, final_value = await collect_rollout(
-                env, policy, state_encoder, action_encoder, buffer, device,
-                max_steps=max_steps,
-            )
-            total_steps += steps
-            print(f"Steps: {steps}")
-            if success:
-                total_success += 1
-            
-            # For non-terminated episodes, update the last stored value with bootstrap value
-            # This is a simplification - ideally we'd track per-rollout, but works for minimal impl
-            if not done and len(buffer.values) > 0:
-                buffer.values[-1] = final_value
+        # Process stats
+        total_steps = sum(stats[0] for stats in rollout_stats)
+        total_success = sum(1 for stats in rollout_stats if stats[2])
         
         # Update policy
         if len(buffer) > 0:
@@ -257,8 +292,6 @@ async def train_ppo(
                 'action_encoder': {'action_types': action_encoder.action_types},
             }, save_path)
             print(f"Saved checkpoint to {save_path}")
-    
-    await env.close()
     
     # Final save
     torch.save({
